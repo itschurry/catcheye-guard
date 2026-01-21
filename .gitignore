@@ -1,0 +1,16 @@
+.DS_Store
+build
+install
+log
+
+**/*.log
+*.bag
+**/.DS_Store
+**/__pycache__/**
+
+# Python bytecode / cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.vscode/sftp.json

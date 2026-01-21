@@ -1,0 +1,29 @@
+services:
+  # [개발 모드]
+  catcheye-dev:
+    extends:
+      file: docker-compose.base.yml
+      service: robot-base
+    image: ghcr.io/itschurry/catcheye-ai:develop
+    container_name: catcheye-ai-develop
+    working_dir: $HOME/ros_ws
+    environment:
+      - BUILD_TYPE=develop
+      - GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0:$GST_PLUGIN_PATH
+    volumes:
+      # 호스트의 현재 폴더(./)를 컨테이너의 작업 폴더로 마운트 (코드 수정 반영)
+      # - ./:/home/${USER:-appuser}/ros_ws:rw
+      - ./:$HOME/ros_ws:rw
+      - /dev:/dev:rw
+      - /run/udev:/run/udev:ro
+      - $HOME/shared:/mnt/shared:rw
+      # VS Code 서버와 확장 프로그램을 저장할 영구 볼륨
+      - $HOME/.vscode-server:$HOME/.vscode-server:rw
+
+    command: bash
+    stdin_open: true
+    tty: true
+    privileged: true
+
+volumes:
+  vscode_extensions:
