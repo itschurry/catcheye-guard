@@ -27,12 +27,12 @@ services:
     environment:
       - DISPLAY=:0
       - QT_X11_NO_MITSHM=1
-      - XAUTHORITY=/root/.Xauthority
+      - XAUTHORITY=/tmp/.Xauthority
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - TZ=Asia/Seoul
 
     # 4. 볼륨 마운트 (공통)
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ${HOME}/.Xauthority:/root/.Xauthority:ro
+      - ${XAUTHORITY:-$HOME/.Xauthority}:/tmp/.Xauthority:ro
       - /etc/udev/rules.d:/etc/udev/rules.d:ro
