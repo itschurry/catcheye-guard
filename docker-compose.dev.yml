@@ -1,3 +1,4 @@
+name: catcheye-ai
 services:
   # [개발 모드]
   catcheye-dev:
@@ -17,8 +18,10 @@ services:
       - /dev:/dev:rw
       - /run/udev:/run/udev:ro
       - $HOME/shared:/mnt/shared:rw
-      # VS Code 서버와 확장 프로그램을 저장할 영구 볼륨
-      - $HOME/.vscode-server:$HOME/.vscode-server:rw
+      - vscode_server:$HOME/.vscode-server:rw
+      - vscode_server_ext:$HOME/.vscode-server/extensions:rw
+      - vscode_server_data:$HOME/.vscode-server/data:rw
+
 
     command: bash
     stdin_open: true
@@ -26,4 +29,6 @@ services:
     privileged: true
 
 volumes:
-  vscode_extensions:
+  vscode_server:
+  vscode_server_ext:
+  vscode_server_data:
