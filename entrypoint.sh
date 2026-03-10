@@ -12,7 +12,7 @@ for device in /dev/ttyUSB* /dev/ttyACM* /dev/pcanusb* /dev/input/js*; do
 done
 
 # ROS 환경 설정
-source /ros_settings.sh
+source ~/ros_ws/ros_settings.sh
 # battery can setup
 # ros2 run battery_can can_setup.sh can0 250000
 

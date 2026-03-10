@@ -17,8 +17,12 @@ services:
       - /dev:/dev:rw
       - /run/udev:/run/udev:ro
       - $HOME/shared:/mnt/shared:rw
+      - $HOME/.ssh:/home/user/.ssh:ro
+      - $HOME/.ssh/known_hosts:/home/user/.ssh/known_hosts:rw
       # VS Code 서버와 확장 프로그램을 저장할 영구 볼륨
-      - $HOME/.vscode-server:$HOME/.vscode-server:rw
+      - vscode_server:/home/user/.vscode-server:rw
+      - vscode_server_ext:/home/user/.vscode-server/extensions:rw
+      - vscode_server_data:/home/user/.vscode-server/data:rw
 
     command: bash
     stdin_open: true
@@ -26,4 +30,6 @@ services:
     privileged: true
 
 volumes:
-  vscode_extensions:
+  vscode_server:
+  vscode_server_ext:
+  vscode_server_data:

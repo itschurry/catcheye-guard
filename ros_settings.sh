@@ -1,9 +1,8 @@
 ############## ROS2 SETTINGS ##############
-# alias sr="source /opt/ros/humble/setup.bash && source /home/rdv/farmily_ws/install/setup.bash"
-alias sr="source /ros_settings.sh"
+alias sr="source ~/ros_ws/ros_settings.sh"
 alias ri="sudo -E rosdep install --from-paths src --ignore-src -r -y"
-alias cb="colcon build --symlink-install --parallel-workers 4 --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release"
-alias cbp="colcon build --symlink-install --parallel-workers 4 --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release --packages-up-to"
+alias cb="colcon build --parallel-workers 4 --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release"
+alias cbp="colcon build --parallel-workers 4 --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release --packages-up-to"
 
 source /opt/ros/$ROS_DISTRO/setup.bash
 if [ -f "$HOME/ros_ws/install/setup.bash" ]; then
@@ -17,13 +16,13 @@ source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
 # export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/opt/ros/humble
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib:/usr/lib
 
-export FASTRTPS_DEFAULT_PROFILES_FILE=$HOME/.ros/fastdds.xml
+# export FASTRTPS_DEFAULT_PROFILES_FILE=$HOME/.ros/fastdds.xml
 # export ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}                 # 0 ~ 101 정수 사용 가능
 # HOST_NS="$(hostname | tr '[:upper:]' '[:lower:]' | tr '-' '_' )"
 # export ROS_NAMESPACE="/${HOST_NS}"
 
 # export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+# export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 # export RMW_IMPLEMENTATION=rmw_connext_cpp
 # export RMW_IMPLEMENTATION=rmw_gurumdds_cpp
 

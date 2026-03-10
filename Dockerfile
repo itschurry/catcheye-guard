@@ -22,12 +22,12 @@ RUN useradd -m -u $UID -g $GID -d $HOME -s /bin/bash $USERNAME && \
     chmod 0440 /etc/sudoers.d/$USERNAME && \
     usermod -aG sudo,video,render,dialout,plugdev $USERNAME
 
-COPY --chown=$USERNAME:$USERNAME ros_settings.sh /ros_settings.sh
-# User가 소유자이므로 sudo 불필요
-RUN chmod +x /ros_settings.sh
+# COPY --chown=$USERNAME:$USERNAME ros_settings.sh /ros_settings.sh
+# # User가 소유자이므로 sudo 불필요
+# RUN chmod +x /ros_settings.sh
 
-COPY --chown=$USERNAME:$USERNAME entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# COPY --chown=$USERNAME:$USERNAME entrypoint.sh /entrypoint.sh
+# RUN chmod +x /entrypoint.sh
 
 USER $USERNAME
 WORKDIR $HOME
@@ -90,8 +90,8 @@ RUN git clone --depth 1 https://github.com/Tencent/ncnn.git && \
 
 
 # .bashrc 설정
-RUN echo 'source /ros_settings.sh' >> ~/.bashrc
+RUN echo 'source ~/ros_ws/ros_settings.sh' >> ~/.bashrc
 
 # 컨테이너 시작
-ENTRYPOINT ["/entrypoint.sh"]
+# ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
