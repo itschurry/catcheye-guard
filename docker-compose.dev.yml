@@ -1,3 +1,4 @@
+name: catcheye-ai
 services:
   # [개발 모드]
   catcheye-dev:
