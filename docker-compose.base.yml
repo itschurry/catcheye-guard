@@ -4,8 +4,8 @@ services:
     # CPU 성능 제한: 3코어만 사용(스케줄링/쿼터 + 코어 바인딩)
     # - cpus: 총 CPU 시간(쿼터) 제한
     # - cpuset: 사용할 논리 코어 고정(예: 0-2 = 3코어)
-    cpus: "3.0"
-    cpuset: "0-2"
+    # cpus: "3.0"
+    # cpuset: "0-2"
     env_file:
       - ./.env
     build:
