@@ -1,0 +1,95 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "cmake: configure[Debug]",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "cmake -S . -B build/debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "cmake: configure[Release]",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "cmake -S . -B build/release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "cmake: build[Debug]",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "cmake --build build/debug --config Debug"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "cmake: build[Release]",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "cmake --build build/release --config Release"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "cmake: clean",
+            "type": "shell",
+            "command": "rm -rf build/debug build/release install log",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "cmake: clean packages-select",
+            "type": "shell",
+            "command": "rm -rf build/debug/${input:pkgName} build/release/${input:pkgName} install/${input:pkgName} log/latest_build/${input:pkgName}",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "cmake: install",
+            "type": "shell",
+            "command": "cmake --install build/release --prefix install",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "pkgName",
+            "type": "promptString",
+            "description": "Enter the package name to build"
+        }
+    ]
+}
