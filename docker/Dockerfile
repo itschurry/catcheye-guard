@@ -86,7 +86,7 @@ WORKDIR $HOME
 RUN git clone --depth 1 https://github.com/Tencent/ncnn.git && \
     cd ncnn && mkdir -p build && cd build && \
     cmake -DNCNN_VULKAN=OFF -DNCNN_BUILD_TOOLS=OFF -DNCNN_BUILD_EXAMPLES=OFF .. && \
-    make -j$(nproc) && sudo make install && sudo ldconfig
+    cmake --build . -j$(nproc) && sudo cmake --install . --prefix /usr/local/ && sudo ldconfig
 
 
 # .bashrc 설정
