@@ -76,9 +76,18 @@
             }
         },
         {
-            "label": "cmake: install",
+            "label": "cmake: install[Debug]",
             "type": "shell",
-            "command": "cmake --install build/release --prefix install",
+            "command": "cmake --install build/debug --prefix install/debug",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "cmake: install[Release]",
+            "type": "shell",
+            "command": "cmake --install build/release --prefix install/release",
             "group": {
                 "kind": "build",
                 "isDefault": true

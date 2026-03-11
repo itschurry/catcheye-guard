@@ -89,6 +89,7 @@ target_include_directories(catcheye_guard
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
+        ${OpenCV_INCLUDE_DIRS}
 )
 
 target_compile_features(catcheye_guard PUBLIC cxx_std_20)
@@ -97,6 +98,14 @@ target_compile_features(catcheye_guard PUBLIC cxx_std_20)
 target_compile_definitions(catcheye_guard
     PUBLIC
         $<$<CONFIG:Debug>:CATCHEYE_DEBUG>
+)
+
+target_link_libraries(catcheye_guard
+    PUBLIC
+        ${OpenCV_LIBS}
+        ncnn
+    PRIVATE
+        yaml-cpp
 )
 
 # ---------------------------------------------------------------------------
