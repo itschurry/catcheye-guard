@@ -194,11 +194,6 @@ install(EXPORT catcheye_guard_targets
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/catcheye_guard
 )
 
-foreach(lib ${OpenCV_LIBS})
-    get_target_property(lib_path ${lib} LOCATION)
-    install(FILES ${lib_path} DESTINATION lib)
-endforeach()
-
 get_target_property(NCNN_LIB ncnn IMPORTED_LOCATION_RELEASE)
 if(NOT NCNN_LIB)
     get_target_property(NCNN_LIB ncnn IMPORTED_LOCATION)
@@ -206,13 +201,4 @@ endif()
 
 if(NCNN_LIB)
     install(FILES ${NCNN_LIB} DESTINATION lib)
-endif()
-
-get_target_property(SPDLOG_LIB spdlog::spdlog IMPORTED_LOCATION_RELEASE)
-if(NOT SPDLOG_LIB)
-    get_target_property(SPDLOG_LIB spdlog::spdlog IMPORTED_LOCATION)
-endif()
-
-if(SPDLOG_LIB)
-    install(FILES ${SPDLOG_LIB} DESTINATION lib)
 endif()
