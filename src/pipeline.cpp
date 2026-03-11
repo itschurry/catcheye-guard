@@ -1,12 +1,14 @@
 #include "catcheye/core/pipeline.hpp"
 
 #include <algorithm>
-#include <iostream>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+
+#include "catcheye/utils/logger.hpp"
 
 namespace catcheye {
 namespace {
@@ -85,29 +87,54 @@ Pipeline::Pipeline(PipelineConfig config)
       detector_(config_.detector) {}
 
 int Pipeline::run() {
+    if (const auto log = logger()) {
+        log->info(
+            "starting pipeline, preview={}, filter_by_class={}, filter_class_id={}",
+            config_.render_preview,
+            config_.filter_by_class,
+            config_.filter_class_id);
+    }
+
     if (!camera_.open()) {
-        std::cerr << "Failed to open camera pipeline.\n";
+        if (const auto log = logger()) {
+            log->error("failed to open camera pipeline");
+        }
         return 1;
     }
 
     if (!detector_.initialize()) {
-        std::cerr << "Failed to initialize detector.\n";
+        if (const auto log = logger()) {
+            log->error("failed to initialize detector");
+        }
         camera_.close();
         return 1;
     }
 
     Frame frame;
+    std::uint64_t frame_count = 0;
     while (true) {
         if (!camera_.read(frame)) {
-            std::cerr << "Failed to read frame.\n";
+            if (const auto log = logger()) {
+                log->warn("stopping pipeline because frame read failed");
+            }
             break;
         }
+        ++frame_count;
 
         const std::vector<Detection> detections = detector_.detect(frame);
         const std::vector<Detection> visible_detections = filter_detections(
             detections,
             config_.filter_by_class,
             config_.filter_class_id);
+
+        if (!visible_detections.empty()) {
+            if (const auto log = logger()) {
+                log->debug(
+                    "frame {} produced {} visible detections",
+                    frame_count,
+                    visible_detections.size());
+            }
+        }
 
         if (config_.render_preview) {
             cv::Mat preview = frame.image.clone();
@@ -116,6 +143,9 @@ int Pipeline::run() {
             cv::imshow(config_.window_name, preview);
             const int key = cv::waitKey(1);
             if (key == 27 || key == 'q') {
+                if (const auto log = logger()) {
+                    log->info("pipeline interrupted by user input '{}'", key);
+                }
                 break;
             }
         }
@@ -123,6 +153,9 @@ int Pipeline::run() {
 
     camera_.close();
     cv::destroyAllWindows();
+    if (const auto log = logger()) {
+        log->info("pipeline stopped after {} frames", frame_count);
+    }
     return 0;
 }
 

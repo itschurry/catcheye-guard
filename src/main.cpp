@@ -1,8 +1,11 @@
 #include <iostream>
 
 #include "catcheye/core/pipeline.hpp"
+#include "catcheye/utils/logger.hpp"
 
 int main(int argc, char** argv) {
+    catcheye::initialize_logging("catcheye_guard", "log");
+
     catcheye::PipelineConfig config;
     config.camera.pipeline =
         "libcamerasrc ! "
@@ -26,10 +29,24 @@ int main(int argc, char** argv) {
     }
 
     if (config.detector.param_path.empty() || config.detector.bin_path.empty()) {
-        std::cerr << "Model paths are required.\n";
+        if (const auto log = catcheye::logger()) {
+            log->error("model paths are required");
+        } else {
+            std::cerr << "Model paths are required.\n";
+        }
+        catcheye::shutdown_logging();
         return 1;
     }
 
+    if (const auto log = catcheye::logger()) {
+        log->info("catcheye-guard starting");
+    }
+
     catcheye::Pipeline pipeline(config);
-    return pipeline.run();
+    const int exit_code = pipeline.run();
+    if (const auto log = catcheye::logger()) {
+        log->info("catcheye-guard exiting with code {}", exit_code);
+    }
+    catcheye::shutdown_logging();
+    return exit_code;
 }

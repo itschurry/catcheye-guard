@@ -66,6 +66,8 @@ message(STATUS "yaml-cpp version: ${yaml-cpp_VERSION}")
 message(STATUS "yaml-cpp include dirs: ${yaml-cpp_INCLUDE_DIRS}")
 message(STATUS "yaml-cpp libraries: ${yaml-cpp_LIBS}")
 
+find_package(spdlog REQUIRED)
+
 # ---------------------------------------------------------------------------
 # Source collection
 # ---------------------------------------------------------------------------
@@ -104,6 +106,7 @@ target_link_libraries(catcheye_guard
     PUBLIC
         ${OpenCV_LIBS}
         ncnn
+        spdlog::spdlog
     PRIVATE
         yaml-cpp
 )

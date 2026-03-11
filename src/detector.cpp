@@ -2,12 +2,13 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <utility>
 
 #include <opencv2/dnn/dnn.hpp>
 #include <opencv2/imgproc.hpp>
 #include <yaml-cpp/yaml.h>
+
+#include "catcheye/utils/logger.hpp"
 
 namespace catcheye {
 namespace {
@@ -29,7 +30,9 @@ std::map<int, std::string> load_class_names(const std::string& yaml_path) {
         const YAML::Node root = YAML::LoadFile(yaml_path);
         const YAML::Node names = root["names"];
         if (!names) {
-            std::cerr << "No 'names' field in metadata file: " << yaml_path << '\n';
+            if (const auto log = logger()) {
+                log->warn("no 'names' field in metadata file '{}'", yaml_path);
+            }
             return class_names;
         }
 
@@ -46,8 +49,9 @@ std::map<int, std::string> load_class_names(const std::string& yaml_path) {
             }
         }
     } catch (const std::exception& exception) {
-        std::cerr << "Failed to load metadata file '" << yaml_path << "': "
-                  << exception.what() << '\n';
+        if (const auto log = logger()) {
+            log->error("failed to load metadata file '{}': {}", yaml_path, exception.what());
+        }
     }
 
     return class_names;
@@ -100,14 +104,18 @@ std::vector<Detection> decode_yolo_output(
     std::vector<Detection> detections;
 
     if (output.dims != 2) {
-        std::cerr << "Unexpected output dims: " << output.dims << '\n';
+        if (const auto log = logger()) {
+            log->error("unexpected output dims: {}", output.dims);
+        }
         return detections;
     }
 
     const int candidate_count = output.w;
     const int attribute_count = output.h;
     if (attribute_count < 6) {
-        std::cerr << "Unexpected output attribute count: " << attribute_count << '\n';
+        if (const auto log = logger()) {
+            log->error("unexpected output attribute count: {}", attribute_count);
+        }
         return detections;
     }
 
@@ -207,24 +215,46 @@ Detector::Detector(DetectorConfig config)
 
 bool Detector::initialize() {
     if (initialized_) {
+        if (const auto log = logger()) {
+            log->debug("detector already initialized");
+        }
         return true;
     }
 
     net_.opt.use_vulkan_compute = config_.use_vulkan_compute;
     net_.opt.num_threads = config_.num_threads;
 
+    if (const auto log = logger()) {
+        log->info(
+            "initializing detector with param='{}', bin='{}', metadata='{}'",
+            config_.param_path,
+            config_.bin_path,
+            config_.metadata_path);
+    }
+
     if (net_.load_param(config_.param_path.c_str()) != 0) {
-        std::cerr << "Failed to load ncnn param file: " << config_.param_path << '\n';
+        if (const auto log = logger()) {
+            log->error("failed to load ncnn param file '{}'", config_.param_path);
+        }
         return false;
     }
 
     if (net_.load_model(config_.bin_path.c_str()) != 0) {
-        std::cerr << "Failed to load ncnn model file: " << config_.bin_path << '\n';
+        if (const auto log = logger()) {
+            log->error("failed to load ncnn model file '{}'", config_.bin_path);
+        }
         return false;
     }
 
     class_names_ = load_class_names(config_.metadata_path);
     initialized_ = true;
+    if (const auto log = logger()) {
+        log->info(
+            "detector initialized, loaded {} class names, input={}x{}",
+            class_names_.size(),
+            config_.input_width,
+            config_.input_height);
+    }
     return true;
 }
 
@@ -256,17 +286,21 @@ std::vector<Detection> Detector::detect(const Frame& frame) {
 
     ncnn::Extractor extractor = net_.create_extractor();
     if (extractor.input(config_.input_blob_name.c_str(), input) != 0) {
-        std::cerr << "Failed to bind ncnn input blob: " << config_.input_blob_name << '\n';
+        if (const auto log = logger()) {
+            log->error("failed to bind ncnn input blob '{}'", config_.input_blob_name);
+        }
         return {};
     }
 
     ncnn::Mat output;
     if (extractor.extract(config_.output_blob_name.c_str(), output) != 0) {
-        std::cerr << "Failed to extract ncnn output blob: " << config_.output_blob_name << '\n';
+        if (const auto log = logger()) {
+            log->error("failed to extract ncnn output blob '{}'", config_.output_blob_name);
+        }
         return {};
     }
 
-    return decode_yolo_output(
+    std::vector<Detection> detections = decode_yolo_output(
         output,
         config_.confidence_threshold,
         config_.nms_threshold,
@@ -275,6 +309,12 @@ std::vector<Detection> Detector::detect(const Frame& frame) {
         preprocessed.pad_height,
         frame.width(),
         frame.height());
+
+    if (const auto log = logger()) {
+        log->debug("detected {} objects in frame", detections.size());
+    }
+
+    return detections;
 }
 
 std::string Detector::class_name(int class_id) const {

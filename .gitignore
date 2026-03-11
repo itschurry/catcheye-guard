@@ -1,7 +1,12 @@
 .DS_Store
 build
 install
-log
+log/*
+CMakeFiles/
+CMakeCache.txt
+Makefile
+cmake_install.cmake
+compile_commands.json
 
 **/*.log
 *.bag
@@ -14,3 +19,4 @@ __pycache__/
 *.py[cod]
 *$py.class
 .vscode/sftp.json
+!log/.gitkeep
