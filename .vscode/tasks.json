@@ -35,7 +35,7 @@
             "command": "bash",
             "args": [
                 "-c",
-                "cmake --build build/debug --config Debug"
+                "cmake --build build/debug --config Debug -- -j $(nproc)"
             ],
             "problemMatcher": [],
             "group": {

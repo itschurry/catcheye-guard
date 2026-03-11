@@ -111,6 +111,9 @@ target_link_libraries(catcheye_guard
         yaml-cpp
 )
 
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+
 # ---------------------------------------------------------------------------
 # Main executable (optional)
 # ---------------------------------------------------------------------------
@@ -178,8 +181,38 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
+install(
+    DIRECTORY models
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/..
+    PATTERN "__pycache__" EXCLUDE
+    PATTERN "*.pyc" EXCLUDE
+)
+
 install(EXPORT catcheye_guard_targets
     FILE catcheye_guard_targets.cmake
     NAMESPACE catcheye::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/catcheye_guard
 )
+
+foreach(lib ${OpenCV_LIBS})
+    get_target_property(lib_path ${lib} LOCATION)
+    install(FILES ${lib_path} DESTINATION lib)
+endforeach()
+
+get_target_property(NCNN_LIB ncnn IMPORTED_LOCATION_RELEASE)
+if(NOT NCNN_LIB)
+    get_target_property(NCNN_LIB ncnn IMPORTED_LOCATION)
+endif()
+
+if(NCNN_LIB)
+    install(FILES ${NCNN_LIB} DESTINATION lib)
+endif()
+
+get_target_property(SPDLOG_LIB spdlog::spdlog IMPORTED_LOCATION_RELEASE)
+if(NOT SPDLOG_LIB)
+    get_target_property(SPDLOG_LIB spdlog::spdlog IMPORTED_LOCATION)
+endif()
+
+if(SPDLOG_LIB)
+    install(FILES ${SPDLOG_LIB} DESTINATION lib)
+endif()
