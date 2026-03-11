@@ -1,12 +1,12 @@
-name: catcheye-ai
+name: catcheye-guard
 services:
   # [개발 모드]
-  catcheye-dev:
+  catcheye-guard-dev:
     extends:
       file: docker-compose.base.yml
       service: robot-base
-    image: ghcr.io/itschurry/catcheye-ai:develop
-    container_name: catcheye-ai-develop
+    image: ghcr.io/itschurry/catcheye-guard:develop
+    container_name: catcheye-guard-develop
     working_dir: $HOME/ros_ws
     environment:
       - BUILD_TYPE=develop
