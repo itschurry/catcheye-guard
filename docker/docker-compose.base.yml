@@ -7,7 +7,7 @@ services:
     # cpus: "3.0"
     # cpuset: "0-2"
     env_file:
-      - ./.env
+      - ../.env
     build:
       context: .
       dockerfile: Dockerfile
