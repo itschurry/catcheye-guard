@@ -38,6 +38,7 @@ int main(int argc, char** argv) {
     catcheye::PipelineConfig config;
     config.camera.pipeline = "libcamerasrc ! "
                              "video/x-raw,width=1280,height=720,framerate=30/1,format=NV12 ! "
+                             "videoflip video-direction=vert ! "
                              "videoconvert ! "
                              "video/x-raw,format=BGR ! "
                              "appsink drop=true max-buffers=1 sync=false";

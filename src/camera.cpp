@@ -43,8 +43,6 @@ bool Camera::read(Frame& frame) {
         return false;
     }
 
-    cv::flip(image, image, 0); // flip vertically to correct orientation
-
     frame.image = std::move(image);
     frame.format = PixelFormat::BGR;
     frame.timestamp = now_millis();
