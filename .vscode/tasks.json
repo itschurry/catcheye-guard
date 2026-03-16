@@ -35,7 +35,7 @@
             "command": "bash",
             "args": [
                 "-c",
-                "cmake --build build/debug --config Debug -- -j $(nproc)"
+                "cmake --build build/debug --config Debug -- -j $(nproc) && ln -sf $(realpath build/debug/compile_commands.json) build/compile_commands.json"
             ],
             "problemMatcher": [],
             "group": {
@@ -49,7 +49,7 @@
             "command": "bash",
             "args": [
                 "-c",
-                "cmake --build build/release --config Release"
+                "cmake --build build/release --config Release -- -j $(nproc) && ln -sf $(realpath build/release/compile_commands.json) build/compile_commands.json"
             ],
             "problemMatcher": [],
             "group": {

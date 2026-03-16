@@ -1,5 +1,5 @@
 CompileFlags:
-  CompilationDatabase: build/debug
+  CompilationDatabase: build
   Add:
     - "-I/opt/ros/jazzy/include"
     - "-I/home/user/ros_ws/install/include"
