@@ -61,6 +61,26 @@ bool segments_intersect(const Point& p1, const Point& q1, const Point& p2, const
     return false;
 }
 
+bool segments_properly_intersect(const Point& p1, const Point& q1, const Point& p2, const Point& q2)
+{
+    const int o1 = orientation(p1, q1, p2);
+    const int o2 = orientation(p1, q1, q2);
+    const int o3 = orientation(p2, q2, p1);
+    const int o4 = orientation(p2, q2, q1);
+
+    return (o1 != 0) && (o2 != 0) && (o3 != 0) && (o4 != 0) && (o1 != o2) && (o3 != o4);
+}
+
+std::vector<Point> bounding_box_corners(double x, double y, double width, double height)
+{
+    return {
+        {x, y},
+        {x + width, y},
+        {x + width, y + height},
+        {x, y + height}
+    };
+}
+
 } // namespace
 
 bool point_in_polygon(const Point& point, const std::vector<Point>& polygon_points)
@@ -190,6 +210,62 @@ bool is_point_inside_any_allowed_zone(const Point& point, const std::vector<RoiP
         }
 
         if (point_in_polygon(point, zone.points)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool is_bounding_box_inside_polygon(
+    double x,
+    double y,
+    double width,
+    double height,
+    const RoiPolygon& polygon
+)
+{
+    if (polygon.points.size() < 3) {
+        return false;
+    }
+
+    const std::vector<Point> corners = bounding_box_corners(x, y, width, height);
+    for (const auto& corner : corners) {
+        if (!point_in_polygon(corner, polygon.points)) {
+            return false;
+        }
+    }
+
+    for (std::size_t i = 0; i < corners.size(); ++i) {
+        const Point& rect_a = corners[i];
+        const Point& rect_b = corners[(i + 1) % corners.size()];
+
+        for (std::size_t j = 0; j < polygon.points.size(); ++j) {
+            const Point& poly_a = polygon.points[j];
+            const Point& poly_b = polygon.points[(j + 1) % polygon.points.size()];
+            if (segments_properly_intersect(rect_a, rect_b, poly_a, poly_b)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool is_bounding_box_inside_any_allowed_zone(
+    double x,
+    double y,
+    double width,
+    double height,
+    const std::vector<RoiPolygon>& allowed_zones
+)
+{
+    for (const auto& zone : allowed_zones) {
+        if (!zone.enabled) {
+            continue;
+        }
+
+        if (is_bounding_box_inside_polygon(x, y, width, height, zone)) {
             return true;
         }
     }

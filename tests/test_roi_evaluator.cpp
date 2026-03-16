@@ -33,10 +33,16 @@ TEST_CASE(evaluator_skips_disabled_zones)
     test_support::assert_true(result.status == EvaluationStatus::Restricted, "expected Restricted");
 }
 
-TEST_CASE(evaluator_bbox_bottom_center)
+TEST_CASE(evaluator_bbox_fully_inside_returns_allowed_when_entire_box_is_inside)
 {
-    const auto result = evaluate_bbox_bottom_center(120.0, 50.0, 100.0, 200.0, config_with_two_zones());
-    test_support::assert_true(result.status == EvaluationStatus::Allowed, "expected Allowed for bottom center");
+    const auto result = evaluate_bbox_fully_inside(120.0, 120.0, 100.0, 200.0, config_with_two_zones());
+    test_support::assert_true(result.status == EvaluationStatus::Allowed, "expected Allowed for fully-contained bbox");
+}
+
+TEST_CASE(evaluator_bbox_fully_inside_returns_restricted_when_box_crosses_zone_boundary)
+{
+    const auto result = evaluate_bbox_fully_inside(120.0, 50.0, 100.0, 200.0, config_with_two_zones());
+    test_support::assert_true(result.status == EvaluationStatus::Restricted, "expected Restricted for partially outside bbox");
 }
 
 TEST_CASE(evaluator_reports_invalid_config)

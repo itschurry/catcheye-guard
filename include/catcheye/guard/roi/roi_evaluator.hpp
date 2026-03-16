@@ -31,4 +31,12 @@ EvaluationResult evaluate_bbox_bottom_center(
     const CameraRoiConfig& config
 );
 
+EvaluationResult evaluate_bbox_fully_inside(
+    double x,
+    double y,
+    double width,
+    double height,
+    const CameraRoiConfig& config
+);
+
 } // namespace catcheye::guard::roi

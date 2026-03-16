@@ -10,6 +10,7 @@ This repository now includes a reusable ROI engine under `include/catcheye/guard
 - Evaluation helpers for intrusion candidates:
   - `evaluate_reference_point`
   - `evaluate_bbox_bottom_center`
+  - `evaluate_bbox_fully_inside`
 
 ### Quick usage
 ```cpp
@@ -23,7 +24,7 @@ if (!parsed.success) {
     // handle parse errors
 }
 
-EvaluationResult decision = evaluate_bbox_bottom_center(100, 50, 80, 150, parsed.config);
+EvaluationResult decision = evaluate_bbox_fully_inside(100, 50, 80, 150, parsed.config);
 // Allowed / Restricted / Invalid
 ```
 
@@ -31,3 +32,4 @@ EvaluationResult decision = evaluate_bbox_bottom_center(100, 50, 80, 150, parsed
 - ROI points are interpreted in original image coordinates.
 - Disabled zones are retained in config but ignored during evaluation.
 - Normal invalid input is reported via result structs, not exceptions.
+- The live preview pipeline treats a detection as allowed only when the full bounding box is contained in an enabled ROI zone.
