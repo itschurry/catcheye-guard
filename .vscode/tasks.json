@@ -60,7 +60,7 @@
         {
             "label": "cmake: clean",
             "type": "shell",
-            "command": "rm -rf build/debug build/release install log",
+            "command": "rm -rf build install log",
             "group": {
                 "kind": "build",
                 "isDefault": true
