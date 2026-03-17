@@ -1,8 +1,10 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "catcheye/core/camera.hpp"
+#include "catcheye/core/frame_streamer.hpp"
 #include "catcheye/guard/detector.hpp"
 #include "catcheye/guard/roi/camera_roi_config.hpp"
 
@@ -19,6 +21,8 @@ struct PipelineConfig {
     bool roi_auto_reload = true;
     std::string roi_config_path;
     catcheye::guard::roi::CameraRoiConfig roi_config;
+    bool stream_preview = false;
+    FrameStreamerConfig stream_config;
 };
 
 class Pipeline {
@@ -31,6 +35,7 @@ class Pipeline {
     PipelineConfig config_;
     Camera camera_;
     Detector detector_;
+    std::unique_ptr<FrameStreamer> frame_streamer_;
 };
 
 } // namespace catcheye

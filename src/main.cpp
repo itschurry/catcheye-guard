@@ -49,17 +49,37 @@ int main(int argc, char** argv) {
     config.detector.metadata_path = resolve_default_model_path(argv[0], "yolo26n_ncnn_model/metadata.yaml");
     std::string roi_config_path = resolve_default_model_path(argv[0], "roi_cam_default.json");
 
-    if (argc > 1) {
-        config.detector.param_path = argv[1];
+    // Parse named flags first
+    std::vector<std::string> positional_args;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--stream") {
+            config.stream_preview = true;
+            config.render_preview = false;
+            // Optional: next arg may be a socket path (if not another flag)
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                config.stream_config.socket_path = argv[++i];
+            }
+        } else if (arg == "--stream-with-preview") {
+            config.stream_preview = true;
+            config.render_preview = true;
+        } else {
+            positional_args.push_back(arg);
+        }
     }
-    if (argc > 2) {
-        config.detector.bin_path = argv[2];
+
+    // Apply positional args: [param_path] [bin_path] [metadata_path] [roi_config_path]
+    if (positional_args.size() > 0) {
+        config.detector.param_path = positional_args[0];
     }
-    if (argc > 3) {
-        config.detector.metadata_path = argv[3];
+    if (positional_args.size() > 1) {
+        config.detector.bin_path = positional_args[1];
     }
-    if (argc > 4) {
-        roi_config_path = argv[4];
+    if (positional_args.size() > 2) {
+        config.detector.metadata_path = positional_args[2];
+    }
+    if (positional_args.size() > 3) {
+        roi_config_path = positional_args[3];
     }
 
     if (config.detector.param_path.empty() || config.detector.bin_path.empty()) {
@@ -108,7 +128,11 @@ int main(int argc, char** argv) {
     config.roi_config = roi_parse_result.config;
 
     if (const auto log = catcheye::logger()) {
-        log->info("catcheye-guard starting with ROI config '{}'", roi_config_path);
+        log->info(
+            "catcheye-guard starting (ROI='{}', stream={}, preview={})",
+            roi_config_path,
+            config.stream_preview,
+            config.render_preview);
     }
 
     catcheye::Pipeline pipeline(config);

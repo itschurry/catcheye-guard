@@ -299,7 +299,11 @@ void draw_detections(
 Pipeline::Pipeline(PipelineConfig config)
     : config_(std::move(config)),
       camera_(config_.camera),
-      detector_(config_.detector) {}
+      detector_(config_.detector) {
+    if (config_.stream_preview) {
+        frame_streamer_ = std::make_unique<FrameStreamer>(config_.stream_config);
+    }
+}
 
 int Pipeline::run() {
     if (const auto log = logger()) {
@@ -360,6 +364,16 @@ int Pipeline::run() {
         return 1;
     }
 
+    if (config_.stream_preview && frame_streamer_) {
+        if (!frame_streamer_->start()) {
+            if (const auto log = logger()) {
+                log->error("failed to start frame streamer");
+            }
+            camera_.close();
+            return 1;
+        }
+    }
+
     Frame frame;
     std::uint64_t frame_count = 0;
     bool roi_frame_size_warning_emitted = false;
@@ -416,7 +430,7 @@ int Pipeline::run() {
             }
         }
 
-        if (config_.render_preview) {
+        if (config_.render_preview || config_.stream_preview) {
             cv::Mat preview = frame.image.clone();
             if (config_.roi_enabled) {
                 if (frame.width() != config_.roi_config.image_width
@@ -440,18 +454,27 @@ int Pipeline::run() {
             }
             draw_detections(preview, evaluated_detections, detector_, config_.roi_enabled);
 
-            cv::imshow(config_.window_name, preview);
-            const int key = cv::waitKey(1);
-            if (key == 27 || key == 'q') {
-                if (const auto log = logger()) {
-                    log->info("pipeline interrupted by user input '{}'", key);
+            if (config_.stream_preview && frame_streamer_) {
+                frame_streamer_->send_frame(preview);
+            }
+
+            if (config_.render_preview) {
+                cv::imshow(config_.window_name, preview);
+                const int key = cv::waitKey(1);
+                if (key == 27 || key == 'q') {
+                    if (const auto log = logger()) {
+                        log->info("pipeline interrupted by user input '{}'", key);
+                    }
+                    break;
                 }
-                break;
             }
         }
     }
 
     camera_.close();
+    if (frame_streamer_) {
+        frame_streamer_->stop();
+    }
     cv::destroyAllWindows();
     if (const auto log = logger()) {
         log->info("pipeline stopped after {} frames", frame_count);
