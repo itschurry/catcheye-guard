@@ -25,6 +25,14 @@ set(CMAKE_CXX_COMPILER "${AARCH64_GXX}")
 
 set(CMAKE_FIND_ROOT_PATH /usr/aarch64-linux-gnu)
 
+# Debian/Ubuntu multiarch packages place CMake configs under /usr/lib/aarch64-linux-gnu/cmake.
+# Pin package config directories explicitly for cross-compile dependency resolution.
+set(OpenCV_DIR "/usr/lib/aarch64-linux-gnu/cmake/opencv4" CACHE PATH "OpenCV CMake package directory" FORCE)
+set(ncnn_DIR "/usr/aarch64-linux-gnu/lib/cmake/ncnn" CACHE PATH "ncnn CMake package directory" FORCE)
+set(yaml-cpp_DIR "/usr/lib/aarch64-linux-gnu/cmake/yaml-cpp" CACHE PATH "yaml-cpp CMake package directory" FORCE)
+set(spdlog_DIR "/usr/lib/aarch64-linux-gnu/cmake/spdlog" CACHE PATH "spdlog CMake package directory" FORCE)
+set(fmt_DIR "/usr/lib/aarch64-linux-gnu/cmake/fmt" CACHE PATH "fmt CMake package directory" FORCE)
+
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
