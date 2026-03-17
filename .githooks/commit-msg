@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+msg_file="${1:?commit message file is required}"
+
+subject="$(sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$msg_file" | head -n 1)"
+
+if [[ -z "${subject}" ]]; then
+  exit 0
+fi
+
+if [[ "${subject}" =~ ^(Merge|Revert|fixup!|squash!) ]]; then
+  exit 0
+fi
+
+pattern='^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\([^)]+\))?!?: .+'
+
+if [[ ! "${subject}" =~ ${pattern} ]]; then
+  cat <<'EOF' >&2
+커밋 메시지 형식이 올바르지 않습니다.
+형식: <type>(선택적 scope): 한국어 메시지
+예시:
+  feat: ROI 침입 판정 로직 추가
+  fix(parser): 빈 설정 파일 처리 보완
+EOF
+  exit 1
+fi
+
+description="${subject#*: }"
+
+if ! printf '%s\n' "${description}" | grep -qP '\p{Hangul}'; then
+  cat <<'EOF' >&2
+커밋 제목은 한국어로 작성해야 합니다.
+예시: chore: 테스트 실행 스크립트 정리
+EOF
+  exit 1
+fi

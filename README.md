@@ -34,6 +34,16 @@ EvaluationResult decision = evaluate_bbox_fully_inside(100, 50, 80, 150, parsed.
 - 일반적인 잘못된 입력은 예외 대신 결과 구조체로 반환됩니다.
 - 라이브 프리뷰 파이프라인에서는 바운딩 박스 전체가 활성 ROI 안에 포함될 때만 허용으로 판단합니다.
 
+## 커밋 메시지 규칙
+
+이 저장소는 로컬 git 설정 기준으로 아래 규칙을 사용합니다.
+
+- 형식: `<type>(선택적 scope): 한국어 메시지`
+- 예시: `feat: ROI 침입 판정 로직 추가`
+- 주요 type: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`, `revert`
+
+저장소의 `.githooks/commit-msg` 훅이 형식을 검사하고, `.gitmessage.txt` 템플릿이 기본 입력 예시를 제공합니다.
+
 ## ARM64 크로스 컴파일 가이드
 
 이 프로젝트는 Ubuntu 24.04 (`noble`) x86_64 호스트에서 ARM64 (`aarch64`) 타깃으로 크로스 컴파일할 수 있습니다.
