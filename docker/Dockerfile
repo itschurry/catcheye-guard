@@ -12,6 +12,8 @@ ARG HOME=/home/${USERNAME}
 # ----------------------------------------------------------------------------------------------
 # [시스템 패키지]
 RUN set -eux; \
+    dpkg --add-architecture arm64; \
+    sed -i '/^Signed-By:/i Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources; \
     printf '%s\n' \
         'Types: deb' \
         'URIs: http://ports.ubuntu.com/ubuntu-ports/' \
@@ -70,11 +72,11 @@ RUN set -eux; \
         libc6-dev-arm64-cross libstdc++-13-dev-arm64-cross; \
     \
     # [빌드 시스템 / 크로스 컴파일] ARM64 대상 라이브러리
+    # Ubuntu 24.04에서는 libglib2.0-dev:arm64 계열이 co-install되지 않아
+    # gstreamer/glib ARM64 dev 패키지는 별도 sysroot 또는 ARM64 환경에서 준비한다.
     apt-get install -y --no-install-recommends \
         libopencv-dev:arm64 libyaml-cpp-dev:arm64 libspdlog-dev:arm64 \
-        libgstreamer1.0-dev:arm64 libgstreamer-plugins-base1.0-dev:arm64 \
-        libjpeg-dev:arm64 libpng-dev:arm64 libtiff5-dev:arm64 \
-        libglib2.0-dev:arm64; \
+        libjpeg-dev:arm64 libpng-dev:arm64 libtiff5-dev:arm64; \
     \
     # [libcamera / rpicam] Python 보조 패키지
     apt-get install -y --no-install-recommends \

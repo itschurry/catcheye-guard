@@ -93,12 +93,16 @@ EOF
 그 다음 패키지 메타데이터를 갱신합니다.
 
 ```bash
+sudo dpkg --add-architecture arm64
+sudo sed -i '/^Signed-By:/i Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
 sudo apt update
 ```
 
 참고:
 - 기존 호스트용 `amd64` 저장소는 그대로 두고, ARM64용 저장소만 별도 추가하는 방식입니다.
 - ARM64 패키지 조회가 `archive.ubuntu.com`이 아니라 `ports.ubuntu.com/ubuntu-ports`로 향해야 합니다.
+- foreign architecture 등록이 빠지면 `apt install package:arm64` 동작이 불안정해질 수 있습니다.
+- 기본 `ubuntu.sources`를 `amd64`로 고정하지 않으면 `apt update`가 `archive.ubuntu.com`과 `security.ubuntu.com`에서 `arm64` 인덱스를 찾다가 `404 Not Found`로 실패할 수 있습니다.
 
 ### 2. 크로스 컴파일러와 기본 빌드 도구 설치
 
@@ -140,18 +144,17 @@ sudo apt install -y \
 
 ```bash
 sudo apt install -y \
-  libgstreamer1.0-dev:arm64 \
-  libgstreamer-plugins-base1.0-dev:arm64 \
   libjpeg-dev:arm64 \
   libpng-dev:arm64 \
-  libtiff5-dev:arm64 \
-  libglib2.0-dev:arm64
+  libtiff5-dev:arm64
 ```
 
 참고:
 - ARM64용 `OpenCVConfig.cmake`는 일반적으로 `/usr/lib/aarch64-linux-gnu/cmake/opencv4`에 설치됩니다.
 - `yaml-cpp` 또는 `spdlog`를 찾지 못하면 `:arm64` 개발 패키지가 실제로 설치되었는지 먼저 확인해야 합니다.
 - configure 단계에서 호스트 `amd64` 라이브러리 경로와 타깃 `arm64` 경로가 섞이지 않도록 주의해야 합니다.
+- Ubuntu 24.04 `amd64` 호스트에서 `libglib2.0-dev:arm64`, `libgstreamer1.0-dev:arm64`, `libgstreamer-plugins-base1.0-dev:arm64`는 `libglib2.0-dev-bin-linux:arm64` 의존성 문제로 함께 설치되지 않을 수 있습니다.
+- 타깃 GStreamer/GLib 헤더까지 꼭 필요하면 multiarch 대신 ARM64 sysroot, chroot, 또는 ARM64 컨테이너에서 준비하는 편이 안전합니다.
 
 ### 4. ARM64용 `ncnn` 준비
 
