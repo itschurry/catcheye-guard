@@ -1,4 +1,5 @@
-FROM ghcr.io/itschurry/ros:jazzy
+# FROM ghcr.io/itschurry/ros:jazzy
+FROM ubuntu:24.04
 LABEL authors="itschurry"
 LABEL maintainer="itschurry"
 ARG DEBIAN_FRONTEND=noninteractive
@@ -8,6 +9,95 @@ ARG UID=1000
 ARG GID=1000
 ARG USERNAME=appuser
 ARG HOME=/home/${USERNAME}
+# ----------------------------------------------------------------------------------------------
+# [시스템 패키지]
+RUN set -eux; \
+    printf '%s\n' \
+        'Types: deb' \
+        'URIs: http://ports.ubuntu.com/ubuntu-ports/' \
+        'Suites: noble noble-updates noble-backports' \
+        'Components: main universe restricted multiverse' \
+        'Architectures: arm64' \
+        'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
+        '' \
+        'Types: deb' \
+        'URIs: http://ports.ubuntu.com/ubuntu-ports/' \
+        'Suites: noble-security' \
+        'Components: main universe restricted multiverse' \
+        'Architectures: arm64' \
+        'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
+        > /etc/apt/sources.list.d/ubuntu-arm64.sources; \
+    apt-get update; \
+    \
+    # [기본 유틸리티] 시스템 / 권한 / 패키지 관리
+    apt-get install -y --no-install-recommends \
+        apt-utils gettext gnupg2 lsb-release software-properties-common \
+        sudo udev; \
+    \
+    # [기본 유틸리티] 다운로드 / 압축 / 전송
+    apt-get install -y --no-install-recommends \
+        curl tar unzip wget xz-utils; \
+    \
+    # [기본 유틸리티] 터미널 / 편집 / 검색
+    apt-get install -y --no-install-recommends \
+        expect htop python3-tk ripgrep tmux tree universal-ctags vim xclip; \
+    \
+    # [개발 / 디버깅 도구] 컴파일 / 빌드 기본
+    apt-get install -y --no-install-recommends \
+        build-essential clang clang-format clangd cmake file g++ git pkg-config; \
+    \
+    # [개발 / 디버깅 도구] 디버깅 / 네트워크 / 장치 확인
+    apt-get install -y --no-install-recommends \
+        can-utils gdb iproute2 kmod net-tools usbutils v4l-utils; \
+    \
+    # [개발 / 디버깅 도구] autotools / 보조 라이브러리
+    apt-get install -y --no-install-recommends \
+        autoconf automake doxygen libelf-dev libmuparser-dev \
+        libpopt-dev libtool; \
+    \
+    # [X11 / GUI] 표시 / 렌더링 / 로그
+    apt-get install -y --no-install-recommends \
+        guvcview libglvnd-dev libspdlog-dev libx11-dev libxext-dev \
+        mesa-utils x11-apps; \
+    \
+    # [빌드 시스템 / 크로스 컴파일] 빌드 툴체인
+    apt-get install -y --no-install-recommends \
+        meson ninja-build; \
+    \
+    # [빌드 시스템 / 크로스 컴파일] ARM64 크로스 컴파일러 / sysroot
+    apt-get install -y --no-install-recommends \
+        gcc-13-aarch64-linux-gnu g++-13-aarch64-linux-gnu \
+        libc6-dev-arm64-cross libstdc++-13-dev-arm64-cross; \
+    \
+    # [빌드 시스템 / 크로스 컴파일] ARM64 대상 라이브러리
+    apt-get install -y --no-install-recommends \
+        libopencv-dev:arm64 libyaml-cpp-dev:arm64 libspdlog-dev:arm64 \
+        libgstreamer1.0-dev:arm64 libgstreamer-plugins-base1.0-dev:arm64 \
+        libjpeg-dev:arm64 libpng-dev:arm64 libtiff5-dev:arm64 \
+        libglib2.0-dev:arm64; \
+    \
+    # [libcamera / rpicam] Python 보조 패키지
+    apt-get install -y --no-install-recommends \
+        pybind11-dev python3-gpiozero python3-jinja2 python3-pip \
+        python3-ply python3-yaml; \
+    \
+    # [libcamera / rpicam] 카메라 / 멀티미디어 / 이미지 코덱
+    apt-get install -y --no-install-recommends \
+        gstreamer1.0-libav gstreamer1.0-libcamera \
+        gstreamer1.0-plugins-bad gstreamer1.0-plugins-base \
+        gstreamer1.0-plugins-good gstreamer1.0-tools \
+        libboost-dev libboost-program-options-dev libdrm-dev \
+        libepoxy-dev libexif-dev libglib2.0-dev libgnutls28-dev \
+        libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+        libjpeg-dev libopencv-dev libpng-dev libtiff5-dev openssl; \
+    \
+    # [libcamera / rpicam] Qt UI / 배포 보조 도구
+    apt-get install -y --no-install-recommends \
+        libqt5core5a libqt5gui5 libqt5widgets5 qtbase5-dev \
+        rsync sshpass; \
+    \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*
 
 RUN userdel -r ubuntu || true && groupdel ubuntu || true
 
@@ -33,19 +123,6 @@ USER $USERNAME
 WORKDIR $HOME
 # ------------------------------------------------------------------------------------------------------------------------------------------------
 # libcamera & rpicam 설치 & 기타 의존성 설치
-RUN sudo apt-get update && sudo apt-get install -y \
-    python3-pip python3-jinja2 meson cmake ninja-build \
-    libboost-dev libgnutls28-dev openssl libtiff5-dev pybind11-dev \
-    python3-yaml python3-ply libglib2.0-dev \
-    cmake libboost-program-options-dev libdrm-dev libexif-dev \
-    libepoxy-dev libjpeg-dev libtiff5-dev libpng-dev \
-    qtbase5-dev libqt5core5a libqt5gui5 libqt5widgets5 \
-    v4l-utils libopencv-dev \
-    gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libcamera gstreamer1.0-libav \
-    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-    python3-gpiozero \
-    rsync sshpass \
-    && sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
 
 RUN git clone https://github.com/raspberrypi/libcamera.git ~/libcamera && \
     cd ~/libcamera && \
@@ -90,7 +167,7 @@ RUN git clone --depth 1 https://github.com/Tencent/ncnn.git && \
 
 
 # .bashrc 설정
-RUN echo 'source ~/ros_ws/ros_settings.sh' >> ~/.bashrc
+# RUN echo 'source ~/ros_ws/ros_settings.sh' >> ~/.bashrc
 
 # 컨테이너 시작
 # ENTRYPOINT ["/entrypoint.sh"]
