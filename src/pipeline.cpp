@@ -212,6 +212,38 @@ std::string roi_status_text(const EvaluatedDetection& detection, bool roi_enable
 }
 
 void draw_roi_zones(cv::Mat& image, const RoiConfig& roi_config) {
+    // Two fill passes (enabled: alpha=0.20, disabled: alpha=0.10).
+    // Grouping zones by enabled state means at most 2 image.clone() calls
+    // regardless of the number of zones, instead of one clone per zone.
+    for (const bool draw_enabled : {true, false}) {
+        const double fill_alpha = draw_enabled ? 0.20 : 0.10;
+        cv::Mat fill_overlay;
+        bool any_zone_drawn = false;
+
+        for (const auto& zone : roi_config.allowed_zones) {
+            if (zone.enabled != draw_enabled || zone.points.size() < 2) {
+                continue;
+            }
+            if (!any_zone_drawn) {
+                fill_overlay = image.clone();
+                any_zone_drawn = true;
+            }
+            std::vector<cv::Point> polygon;
+            polygon.reserve(zone.points.size());
+            for (const auto& point : zone.points) {
+                polygon.push_back(to_cv_point(point));
+            }
+            const cv::Scalar color = draw_enabled ? cv::Scalar(255, 255, 0) : cv::Scalar(128, 128, 128);
+            const std::vector<std::vector<cv::Point>> polygons {polygon};
+            cv::fillPoly(fill_overlay, polygons, color, cv::LINE_AA);
+        }
+
+        if (any_zone_drawn) {
+            cv::addWeighted(fill_overlay, fill_alpha, image, 1.0 - fill_alpha, 0.0, image);
+        }
+    }
+
+    // Draw outlines and labels over the blended fills.
     for (const auto& zone : roi_config.allowed_zones) {
         if (zone.points.size() < 2) {
             continue;
@@ -224,13 +256,7 @@ void draw_roi_zones(cv::Mat& image, const RoiConfig& roi_config) {
         }
 
         const cv::Scalar color = zone.enabled ? cv::Scalar(255, 255, 0) : cv::Scalar(128, 128, 128);
-        const double fill_alpha = zone.enabled ? 0.20 : 0.10;
         const int thickness = zone.enabled ? 2 : 1;
-
-        cv::Mat fill_overlay = image.clone();
-        const std::vector<std::vector<cv::Point>> polygons {polygon};
-        cv::fillPoly(fill_overlay, polygons, color, cv::LINE_AA);
-        cv::addWeighted(fill_overlay, fill_alpha, image, 1.0 - fill_alpha, 0.0, image);
 
         cv::polylines(image, polygon, true, color, thickness, cv::LINE_AA);
 
@@ -377,6 +403,7 @@ int Pipeline::run() {
     Frame frame;
     std::uint64_t frame_count = 0;
     bool roi_frame_size_warning_emitted = false;
+    std::vector<Detection> cached_detections;
     while (true) {
         if (!camera_.read(frame)) {
             if (const auto log = logger()) {
@@ -386,9 +413,19 @@ int Pipeline::run() {
         }
         ++frame_count;
 
-        try_reload_roi_config(config_, last_seen_roi_config_text, roi_reload_watch_warning_emitted);
+        // Throttle ROI config file reads to once per second (every 15 frames at 15fps)
+        // instead of reading from disk on every frame.
+        constexpr std::uint64_t ROI_RELOAD_INTERVAL_FRAMES = 15;
+        if (frame_count % ROI_RELOAD_INTERVAL_FRAMES == 0) {
+            try_reload_roi_config(config_, last_seen_roi_config_text, roi_reload_watch_warning_emitted);
+        }
 
-        const std::vector<Detection> detections = detector_.detect(frame);
+        // Run NCNN inference only every N frames to reduce CPU load.
+        // Intermediate frames reuse the previous detection result.
+        if ((frame_count - 1) % static_cast<std::uint64_t>(config_.detect_every_n_frames) == 0) {
+            cached_detections = detector_.detect(frame);
+        }
+        const std::vector<Detection>& detections = cached_detections;
         const std::vector<Detection> visible_detections = filter_detections(
             detections,
             config_.filter_by_class,

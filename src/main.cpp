@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
 
     catcheye::PipelineConfig config;
     config.camera.pipeline = "libcamerasrc ! "
-                             "video/x-raw,width=1280,height=720,framerate=30/1,format=NV12 ! "
+                             "video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! "
                              "videoflip video-direction=vert ! "
                              "videoconvert ! "
                              "video/x-raw,format=BGR ! "
@@ -63,6 +63,14 @@ int main(int argc, char** argv) {
         } else if (arg == "--stream-with-preview") {
             config.stream_preview = true;
             config.render_preview = true;
+        } else if (arg == "--num-threads" && i + 1 < argc) {
+            try {
+                config.detector.num_threads = std::stoi(argv[++i]);
+            } catch (const std::exception&) {
+                std::cerr << "invalid --num-threads value: " << argv[i] << '\n';
+                catcheye::shutdown_logging();
+                return 1;
+            }
         } else {
             positional_args.push_back(arg);
         }
@@ -111,11 +119,8 @@ int main(int argc, char** argv) {
         if (const auto log = catcheye::logger()) {
             log->error("ROI config '{}' failed validation", roi_config_path);
             for (const auto& issue : roi_validation_result.issues) {
-                log->error(
-                    "ROI validation issue: zone_index={}, point_index={}, message={}",
-                    issue.zone_index,
-                    issue.point_index,
-                    issue.message);
+                log->error("ROI validation issue: zone_index={}, point_index={}, message={}", issue.zone_index, issue.point_index,
+                           issue.message);
             }
         }
         catcheye::shutdown_logging();
@@ -128,11 +133,8 @@ int main(int argc, char** argv) {
     config.roi_config = roi_parse_result.config;
 
     if (const auto log = catcheye::logger()) {
-        log->info(
-            "catcheye-guard starting (ROI='{}', stream={}, preview={})",
-            roi_config_path,
-            config.stream_preview,
-            config.render_preview);
+        log->info("catcheye-guard starting (ROI='{}', stream={}, preview={})", roi_config_path, config.stream_preview,
+                  config.render_preview);
     }
 
     catcheye::Pipeline pipeline(config);

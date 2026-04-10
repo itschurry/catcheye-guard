@@ -23,6 +23,7 @@ struct PipelineConfig {
     catcheye::guard::roi::CameraRoiConfig roi_config;
     bool stream_preview = false;
     FrameStreamerConfig stream_config;
+    int detect_every_n_frames = 2;
 };
 
 class Pipeline {
