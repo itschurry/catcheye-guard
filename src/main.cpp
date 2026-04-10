@@ -50,24 +50,35 @@ int main(int argc, char** argv) {
     std::string roi_config_path = resolve_default_model_path(argv[0], "roi_cam_default.json");
 
     // Parse named flags first
+    const std::span<char* const> ARGS(argv, static_cast<std::size_t>(argc));
     std::vector<std::string> positional_args;
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+    for (std::size_t i = 1; i < ARGS.size(); ++i) {
+        std::string arg(ARGS[i]);
         if (arg == "--stream") {
             config.stream_preview = true;
             config.render_preview = false;
-            // Optional: next arg may be a socket path (if not another flag)
-            if (i + 1 < argc && argv[i + 1][0] != '-') {
-                config.stream_config.socket_path = argv[++i];
+            // Optional: next arg may be a port number (if not another flag)
+            if (i + 1 < ARGS.size() && ARGS[i + 1][0] != '-') {
+                ++i;
+                std::string port_str(ARGS[i]);
+                try {
+                    config.stream_config.port = std::stoi(port_str);
+                } catch (const std::exception&) {
+                    std::cerr << "invalid --stream port value: " << port_str << '\n';
+                    catcheye::shutdown_logging();
+                    return 1;
+                }
             }
         } else if (arg == "--stream-with-preview") {
             config.stream_preview = true;
             config.render_preview = true;
-        } else if (arg == "--num-threads" && i + 1 < argc) {
+        } else if (arg == "--num-threads" && i + 1 < ARGS.size()) {
+            ++i;
+            std::string num_threads_str(ARGS[i]);
             try {
-                config.detector.num_threads = std::stoi(argv[++i]);
+                config.detector.num_threads = std::stoi(num_threads_str);
             } catch (const std::exception&) {
-                std::cerr << "invalid --num-threads value: " << argv[i] << '\n';
+                std::cerr << "invalid --num-threads value: " << num_threads_str << '\n';
                 catcheye::shutdown_logging();
                 return 1;
             }
@@ -76,7 +87,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    // Apply positional args: [param_path] [bin_path] [metadata_path] [roi_config_path]
+    // Apply positional ARGS: [param_path] [bin_path] [metadata_path] [roi_config_path]
     if (positional_args.size() > 0) {
         config.detector.param_path = positional_args[0];
     }

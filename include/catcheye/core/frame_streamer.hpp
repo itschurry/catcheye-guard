@@ -3,7 +3,6 @@
 #include <atomic>
 #include <cstdint>
 #include <mutex>
-#include <string>
 #include <thread>
 #include <vector>
 
@@ -11,14 +10,16 @@
 
 namespace catcheye {
 
+static constexpr int DEFAULT_STREAM_PORT = 8080;
+
 struct FrameStreamerConfig {
-    std::string socket_path = "/tmp/catcheye_guard_preview.sock";
+    int port = DEFAULT_STREAM_PORT;
     int jpeg_quality = 80;
     int max_clients = 4;
 };
 
-/// Streams rendered preview frames to connected clients via Unix domain socket.
-/// Protocol: [uint32_t frame_size (LE)] [JPEG bytes]
+/// Streams rendered preview frames to connected clients via MJPEG over HTTP (TCP).
+/// Clients connect to http://<host>:<port>/ and receive a multipart/x-mixed-replace stream.
 class FrameStreamer {
    public:
     explicit FrameStreamer(FrameStreamerConfig config = {});
@@ -37,7 +38,6 @@ class FrameStreamer {
 
    private:
     void accept_loop();
-    void remove_disconnected_clients();
 
     FrameStreamerConfig config_;
     int server_fd_ {-1};
