@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -16,10 +17,16 @@ struct FrameStreamerConfig {
     int port = DEFAULT_STREAM_PORT;
     int jpeg_quality = 80;
     int max_clients = 4;
+    /// Path to the ROI JSON config file. If set, enables GET /api/roi and PUT /api/roi.
+    std::string roi_config_path;
 };
 
 /// Streams rendered preview frames to connected clients via MJPEG over HTTP (TCP).
-/// Clients connect to http://<host>:<port>/ and receive a multipart/x-mixed-replace stream.
+///
+/// Endpoints served on the same port:
+///   GET  /         → MJPEG stream (multipart/x-mixed-replace)
+///   GET  /api/roi  → current ROI config as JSON
+///   PUT  /api/roi  → overwrite ROI config JSON (pipeline auto-reloads)
 class FrameStreamer {
    public:
     explicit FrameStreamer(FrameStreamerConfig config = {});
@@ -38,6 +45,10 @@ class FrameStreamer {
 
    private:
     void accept_loop();
+    /// Read HTTP request, then route to MJPEG or REST handler.
+    void handle_client(int sock_fd);
+    /// Send MJPEG HTTP header and add client to the active stream list.
+    void handle_mjpeg_connect(int sock_fd);
 
     FrameStreamerConfig config_;
     int server_fd_ {-1};

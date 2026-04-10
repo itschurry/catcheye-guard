@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
 
     catcheye::PipelineConfig config;
     config.camera.pipeline = "libcamerasrc ! "
-                             "video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! "
+                             "video/x-raw,width=1280,height=720,framerate=15/1,format=NV12 ! "
                              "videoflip video-direction=vert ! "
                              "videoconvert ! "
                              "video/x-raw,format=BGR ! "
@@ -142,6 +142,7 @@ int main(int argc, char** argv) {
     config.roi_auto_reload = true;
     config.roi_config_path = roi_config_path;
     config.roi_config = roi_parse_result.config;
+    config.stream_config.roi_config_path = roi_config_path;
 
     if (const auto log = catcheye::logger()) {
         log->info("catcheye-guard starting (ROI='{}', stream={}, preview={})", roi_config_path, config.stream_preview,
