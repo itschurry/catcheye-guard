@@ -322,9 +322,9 @@ void draw_detections(
 
 } // namespace
 
-Pipeline::Pipeline(PipelineConfig config)
+Pipeline::Pipeline(PipelineConfig config, std::unique_ptr<FrameSource> source)
     : config_(std::move(config)),
-      camera_(config_.camera),
+      source_(std::move(source)),
       detector_(config_.detector) {
     if (config_.stream_preview) {
         frame_streamer_ = std::make_unique<FrameStreamer>(config_.stream_config);
@@ -375,9 +375,16 @@ int Pipeline::run() {
         }
     }
 
-    if (!camera_.open()) {
+    if (!source_) {
         if (const auto log = logger()) {
-            log->error("failed to open camera pipeline");
+            log->error("input source is not configured");
+        }
+        return 1;
+    }
+
+    if (!source_->open()) {
+        if (const auto log = logger()) {
+            log->error("failed to open input source '{}'", source_->describe());
         }
         return 1;
     }
@@ -386,7 +393,7 @@ int Pipeline::run() {
         if (const auto log = logger()) {
             log->error("failed to initialize detector");
         }
-        camera_.close();
+        source_->close();
         return 1;
     }
 
@@ -395,7 +402,7 @@ int Pipeline::run() {
             if (const auto log = logger()) {
                 log->error("failed to start frame streamer");
             }
-            camera_.close();
+            source_->close();
             return 1;
         }
     }
@@ -405,11 +412,34 @@ int Pipeline::run() {
     bool roi_frame_size_warning_emitted = false;
     std::vector<Detection> cached_detections;
     while (true) {
-        if (!camera_.read(frame)) {
+        const FrameReadStatus read_status = source_->read(frame);
+        if (read_status == FrameReadStatus::EndOfStream) {
             if (const auto log = logger()) {
-                log->warn("stopping pipeline because frame read failed");
+                log->info("input source reached end: '{}'", source_->describe());
+            }
+            if (frame_count == 0) {
+                if (const auto log = logger()) {
+                    log->error("input source ended before any frame was processed: '{}'", source_->describe());
+                }
+                if (frame_streamer_) {
+                    frame_streamer_->stop();
+                }
+                source_->close();
+                cv::destroyAllWindows();
+                return 1;
             }
             break;
+        }
+        if (read_status == FrameReadStatus::Error) {
+            if (const auto log = logger()) {
+                log->warn("stopping pipeline because frame read failed from '{}'", source_->describe());
+            }
+            if (frame_streamer_) {
+                frame_streamer_->stop();
+            }
+            source_->close();
+            cv::destroyAllWindows();
+            return 1;
         }
         ++frame_count;
 
@@ -508,7 +538,7 @@ int Pipeline::run() {
         }
     }
 
-    camera_.close();
+    source_->close();
     if (frame_streamer_) {
         frame_streamer_->stop();
     }

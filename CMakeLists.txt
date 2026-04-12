@@ -152,6 +152,11 @@ if(CATCHEYE_GUARD_BUILD_TESTS)
                 ${CMAKE_CURRENT_SOURCE_DIR}/include
         )
 
+        target_compile_definitions(catcheye_guard_tests
+            PRIVATE
+                CATCHEYE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+
         add_test(
             NAME catcheye_guard_tests
             COMMAND catcheye_guard_tests

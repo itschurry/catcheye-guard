@@ -1,8 +1,11 @@
 #include <iostream>
 #include <filesystem>
+#include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
+#include "catcheye/core/frame_source.hpp"
 #include "catcheye/core/pipeline.hpp"
 #include "catcheye/guard/roi/roi_repository.hpp"
 #include "catcheye/guard/roi/roi_validation.hpp"
@@ -37,12 +40,7 @@ int main(int argc, char** argv) {
     catcheye::initialize_logging("catcheye_guard", "log");
 
     catcheye::PipelineConfig config;
-    config.camera.pipeline = "libcamerasrc ! "
-                             "video/x-raw,width=1280,height=720,framerate=15/1,format=NV12 ! "
-                             "videoflip video-direction=vert ! "
-                             "videoconvert ! "
-                             "video/x-raw,format=BGR ! "
-                             "appsink drop=true max-buffers=1 sync=false";
+    catcheye::InputSourceConfig input_config;
 
     config.detector.param_path = resolve_default_model_path(argv[0], "yolo26n_ncnn_model/model.ncnn.param");
     config.detector.bin_path = resolve_default_model_path(argv[0], "yolo26n_ncnn_model/model.ncnn.bin");
@@ -52,9 +50,42 @@ int main(int argc, char** argv) {
     // Parse named flags first
     const std::span<char* const> ARGS(argv, static_cast<std::size_t>(argc));
     std::vector<std::string> positional_args;
+    bool input_mode_selected = false;
     for (std::size_t i = 1; i < ARGS.size(); ++i) {
         std::string arg(ARGS[i]);
-        if (arg == "--stream") {
+        if (arg == "--image" && i + 1 < ARGS.size()) {
+            if (input_mode_selected) {
+                std::cerr << "input mode flags are mutually exclusive\n";
+                catcheye::shutdown_logging();
+                return 1;
+            }
+            input_mode_selected = true;
+            input_config.type = catcheye::InputSourceType::ImageFile;
+            input_config.uri = ARGS[++i];
+        } else if (arg == "--video" && i + 1 < ARGS.size()) {
+            if (input_mode_selected) {
+                std::cerr << "input mode flags are mutually exclusive\n";
+                catcheye::shutdown_logging();
+                return 1;
+            }
+            input_mode_selected = true;
+            input_config.type = catcheye::InputSourceType::VideoFile;
+            input_config.uri = ARGS[++i];
+        } else if (arg == "--camera") {
+            if (input_mode_selected) {
+                std::cerr << "input mode flags are mutually exclusive\n";
+                catcheye::shutdown_logging();
+                return 1;
+            }
+            input_mode_selected = true;
+            input_config.type = catcheye::InputSourceType::Camera;
+        } else if (arg == "--camera-pipeline" && i + 1 < ARGS.size()) {
+            input_config.camera_pipeline = ARGS[++i];
+        } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" || arg == "--num-threads") {
+            std::cerr << "missing value for flag: " << arg << '\n';
+            catcheye::shutdown_logging();
+            return 1;
+        } else if (arg == "--stream") {
             config.stream_preview = true;
             config.render_preview = false;
             // Optional: next arg may be a port number (if not another flag)
@@ -85,6 +116,22 @@ int main(int argc, char** argv) {
         } else {
             positional_args.push_back(arg);
         }
+    }
+
+    if ((input_config.type == catcheye::InputSourceType::ImageFile
+         || input_config.type == catcheye::InputSourceType::VideoFile)
+        && !input_config.camera_pipeline.empty()) {
+        std::cerr << "--camera-pipeline is only valid with --camera\n";
+        catcheye::shutdown_logging();
+        return 1;
+    }
+
+    if ((input_config.type == catcheye::InputSourceType::ImageFile
+         || input_config.type == catcheye::InputSourceType::VideoFile)
+        && input_config.uri.empty()) {
+        std::cerr << "input path is required for --image or --video\n";
+        catcheye::shutdown_logging();
+        return 1;
     }
 
     // Apply positional ARGS: [param_path] [bin_path] [metadata_path] [roi_config_path]
@@ -139,7 +186,7 @@ int main(int argc, char** argv) {
     }
 
     config.roi_enabled = true;
-    config.roi_auto_reload = true;
+    config.roi_auto_reload = input_config.type == catcheye::InputSourceType::Camera;
     config.roi_config_path = roi_config_path;
     config.roi_config = roi_parse_result.config;
     config.stream_config.roi_config_path = roi_config_path;
@@ -149,7 +196,8 @@ int main(int argc, char** argv) {
                   config.render_preview);
     }
 
-    catcheye::Pipeline pipeline(config);
+    std::unique_ptr<catcheye::FrameSource> frame_source = catcheye::create_frame_source(std::move(input_config));
+    catcheye::Pipeline pipeline(config, std::move(frame_source));
     const int exit_code = pipeline.run();
     if (const auto log = catcheye::logger()) {
         log->info("catcheye-guard exiting with code {}", exit_code);
