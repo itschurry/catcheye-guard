@@ -78,6 +78,29 @@ TEST_CASE(build_app_bootstrap_applies_positional_overrides)
     test_support::assert_true(bootstrap.processor_config.roi_config_path == "roi_override", "roi override mismatch");
 }
 
+TEST_CASE(parse_app_options_supports_headless_mode)
+{
+    char arg0[] = "app";
+    char arg1[] = "--headless";
+    char* argv[] = {arg0, arg1};
+
+    const auto options = catcheye::guard::parse_app_options(2, argv);
+    test_support::assert_true(!options.render_preview, "headless mode should disable preview");
+}
+
+TEST_CASE(parse_app_options_supports_websocket_mode)
+{
+    char arg0[] = "app";
+    char arg1[] = "--ws";
+    char arg2[] = "9001";
+    char* argv[] = {arg0, arg1, arg2};
+
+    const auto options = catcheye::guard::parse_app_options(3, argv);
+    test_support::assert_true(options.publish_results, "ws mode should enable publisher");
+    test_support::assert_true(!options.render_preview, "ws mode should disable preview by default");
+    test_support::assert_true(options.websocket_port == 9001, "ws mode should parse port");
+}
+
 TEST_CASE(load_and_validate_roi_config_rejects_invalid_file)
 {
     const fs::path bad_path = fs::temp_directory_path() / "catcheye_bad_roi_config.json";

@@ -4,18 +4,18 @@
 #include <string>
 #include <vector>
 
-#include "catcheye/core/frame_streamer.hpp"
 #include "catcheye/input/frame_source.hpp"
 #include "catcheye/runtime/frame_processing_runner.hpp"
+#include "catcheye/transport/websocket_publisher.hpp"
 #include "guard/guard_processor_config.hpp"
 
 namespace catcheye::guard {
 
 struct AppOptions {
     catcheye::input::InputSourceConfig input;
-    bool stream_preview = false;
+    bool publish_results = false;
     bool render_preview = true;
-    int stream_port = 0;
+    int websocket_port = 8080;
     int num_threads = 2;
     std::vector<std::string> positional_args;
 };
@@ -35,8 +35,8 @@ struct LoadedRoiConfig {
 struct AppBootstrap {
     GuardProcessorConfig processor_config;
     catcheye::runtime::RuntimeConfig runtime_config;
-    FrameStreamerConfig stream_config;
-    bool stream_preview = false;
+    catcheye::transport::WebSocketPublisherConfig publisher_config;
+    bool publish_results = false;
     std::unique_ptr<catcheye::input::FrameSource> source;
 };
 

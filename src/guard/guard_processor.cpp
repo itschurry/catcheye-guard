@@ -1,9 +1,12 @@
 #include "guard/guard_processor.hpp"
 
 #include <cstdint>
+#include <sstream>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+#include "catcheye/protocol/frame_message.hpp"
 #include "catcheye/guard/roi/roi_validation.hpp"
 #include "catcheye/utils/logger.hpp"
 #include "guard/preview_renderer.hpp"
@@ -14,6 +17,84 @@ namespace {
 
 using RoiEvaluationStatus = catcheye::guard::roi::EvaluationStatus;
 constexpr std::uint64_t ROI_RELOAD_INTERVAL_FRAMES = 15;
+
+std::string roi_status_to_string(RoiEvaluationStatus status)
+{
+    switch (status) {
+        case RoiEvaluationStatus::Allowed:
+            return "allowed";
+        case RoiEvaluationStatus::Restricted:
+            return "restricted";
+        case RoiEvaluationStatus::Invalid:
+            return "invalid";
+    }
+    return "unknown";
+}
+
+std::string escape_json(std::string_view value)
+{
+    std::string escaped;
+    escaped.reserve(value.size());
+
+    for (const char ch : value) {
+        switch (ch) {
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            case '\t':
+                escaped += "\\t";
+                break;
+            default:
+                escaped.push_back(ch);
+                break;
+        }
+    }
+
+    return escaped;
+}
+
+std::string build_metadata_json(
+    const std::vector<EvaluatedDetection>& detections,
+    const Detector& detector,
+    bool roi_enabled)
+{
+    std::ostringstream oss;
+    oss << "{\"roi_enabled\":" << (roi_enabled ? "true" : "false")
+        << ",\"detection_count\":" << detections.size()
+        << ",\"detections\":[";
+
+    for (std::size_t i = 0; i < detections.size(); ++i) {
+        const auto& item = detections[i];
+        if (i > 0) {
+            oss << ',';
+        }
+        oss << "{"
+            << "\"class_id\":" << item.detection.class_id
+            << ",\"class_name\":\"" << escape_json(detector.class_name(item.detection.class_id)) << "\""
+            << ",\"score\":" << item.detection.score
+            << ",\"bbox\":{"
+            << "\"x\":" << item.detection.box.x
+            << ",\"y\":" << item.detection.box.y
+            << ",\"width\":" << item.detection.box.width
+            << ",\"height\":" << item.detection.box.height
+            << "}"
+            << ",\"roi_status\":\"" << roi_status_to_string(item.roi_result.status) << "\""
+            << ",\"roi_reason\":\"" << escape_json(item.roi_result.reason) << "\""
+            << "}";
+    }
+
+    oss << "]}";
+    return oss.str();
+}
 
 } // namespace
 
@@ -106,7 +187,7 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(
     }
 
     catcheye::runtime::ProcessOutput output;
-    if (!context.needs_visualization) {
+    if (!context.needs_preview && !context.needs_publish) {
         return output;
     }
 
@@ -133,8 +214,20 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(
     }
     draw_detections(preview, evaluated_detections, detector_, config_.roi_enabled);
 
-    output.has_visualization = true;
-    output.visualization = std::move(preview);
+    if (context.needs_preview) {
+        output.has_preview = true;
+        output.preview_frame = preview.clone();
+    }
+
+    if (context.needs_publish) {
+        output.has_message = true;
+        output.message = catcheye::protocol::encode_jpeg_frame(
+            preview,
+            build_metadata_json(evaluated_detections, detector_, config_.roi_enabled),
+            "person-guard",
+            jpeg_quality_);
+    }
+
     return output;
 }
 

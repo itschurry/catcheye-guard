@@ -12,8 +12,8 @@
 #include "catcheye/guard/roi/roi_repository.hpp"
 #include "catcheye/guard/roi/roi_validation.hpp"
 #include "catcheye/runtime/frame_processing_runner.hpp"
+#include "catcheye/transport/websocket_publisher.hpp"
 #include "catcheye/utils/logger.hpp"
-#include "guard/frame_streamer_sink.hpp"
 #include "guard/guard_processor.hpp"
 
 namespace catcheye::guard {
@@ -79,16 +79,18 @@ AppOptions parse_app_options(int argc, char** argv)
             options.input.type = catcheye::input::InputSourceType::Camera;
         } else if (arg == "--camera-pipeline" && i + 1 < args.size()) {
             options.input.camera_pipeline = args[++i];
-        } else if (arg == "--stream") {
-            options.stream_preview = true;
+        } else if (arg == "--ws") {
+            options.publish_results = true;
             options.render_preview = false;
             if (i + 1 < args.size() && args[i + 1][0] != '-') {
                 ++i;
-                options.stream_port = std::stoi(args[i]);
+                options.websocket_port = std::stoi(args[i]);
             }
-        } else if (arg == "--stream-with-preview") {
-            options.stream_preview = true;
+        } else if (arg == "--ws-with-preview") {
+            options.publish_results = true;
             options.render_preview = true;
+        } else if (arg == "--headless") {
+            options.render_preview = false;
         } else if (arg == "--num-threads" && i + 1 < args.size()) {
             ++i;
             options.num_threads = std::stoi(args[i]);
@@ -162,14 +164,9 @@ AppBootstrap build_app_bootstrap(
 
     bootstrap.runtime_config.window_name = "CatchEye Person Guard";
     bootstrap.runtime_config.render_preview = options.render_preview;
-    bootstrap.runtime_config.stream_preview = options.stream_preview;
     bootstrap.runtime_config.process_every_n_frames = 2;
-
-    bootstrap.stream_preview = options.stream_preview;
-    bootstrap.stream_config.roi_config_path = loaded_roi_config.path;
-    if (options.stream_port > 0) {
-        bootstrap.stream_config.port = options.stream_port;
-    }
+    bootstrap.publish_results = options.publish_results;
+    bootstrap.publisher_config.port = options.websocket_port;
 
     if (!options.positional_args.empty()) {
         bootstrap.processor_config.detector.param_path = options.positional_args[0];
@@ -182,7 +179,6 @@ AppBootstrap build_app_bootstrap(
     }
     if (options.positional_args.size() > 3) {
         bootstrap.processor_config.roi_config_path = options.positional_args[3];
-        bootstrap.stream_config.roi_config_path = options.positional_args[3];
     }
 
     if (bootstrap.processor_config.detector.param_path.empty() || bootstrap.processor_config.detector.bin_path.empty()) {
@@ -204,15 +200,15 @@ int run_app(int argc, char** argv)
 
     if (const auto log = logger()) {
         log->info(
-            "catcheye-guard starting (ROI='{}', stream={}, preview={})",
+            "catcheye-guard starting (ROI='{}', preview={}, ws={})",
             bootstrap.processor_config.roi_config_path,
-            bootstrap.runtime_config.stream_preview,
-            bootstrap.runtime_config.render_preview);
+            bootstrap.runtime_config.render_preview,
+            bootstrap.publish_results);
     }
 
-    std::unique_ptr<catcheye::runtime::PreviewSink> preview_sink;
-    if (bootstrap.stream_preview) {
-        preview_sink = std::make_unique<catcheye::FrameStreamerSink>(bootstrap.stream_config);
+    std::unique_ptr<catcheye::transport::ResultPublisher> publisher;
+    if (bootstrap.publish_results) {
+        publisher = std::make_unique<catcheye::transport::WebSocketPublisher>(bootstrap.publisher_config);
     }
 
     auto processor = std::make_unique<catcheye::GuardProcessor>(std::move(bootstrap.processor_config));
@@ -220,7 +216,7 @@ int run_app(int argc, char** argv)
         std::move(bootstrap.runtime_config),
         std::move(bootstrap.source),
         std::move(processor),
-        std::move(preview_sink));
+        std::move(publisher));
     return runner.run();
 }
 
