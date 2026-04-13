@@ -48,24 +48,14 @@ endif()
 # ---------------------------------------------------------------------------
 # Dependencies
 # ---------------------------------------------------------------------------
-set(CATCHEYE_VISION_INPUT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/catcheye-vision-input")
-if(NOT EXISTS "${CATCHEYE_VISION_INPUT_SOURCE_DIR}/CMakeLists.txt")
-    message(FATAL_ERROR "catcheye-vision-input repo not found at ${CATCHEYE_VISION_INPUT_SOURCE_DIR}")
+set(CATCHEYE_VISION_SDK_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/catcheye-vision-sdk")
+if(NOT EXISTS "${CATCHEYE_VISION_SDK_SOURCE_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "catcheye-vision-sdk repo not found at ${CATCHEYE_VISION_SDK_SOURCE_DIR}")
 endif()
 
 add_subdirectory(
-    "${CATCHEYE_VISION_INPUT_SOURCE_DIR}"
-    "${CMAKE_CURRENT_BINARY_DIR}/catcheye-vision-input"
-)
-
-set(CATCHEYE_VISION_RUNTIME_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/catcheye-vision-runtime")
-if(NOT EXISTS "${CATCHEYE_VISION_RUNTIME_SOURCE_DIR}/CMakeLists.txt")
-    message(FATAL_ERROR "catcheye-vision-runtime repo not found at ${CATCHEYE_VISION_RUNTIME_SOURCE_DIR}")
-endif()
-
-add_subdirectory(
-    "${CATCHEYE_VISION_RUNTIME_SOURCE_DIR}"
-    "${CMAKE_CURRENT_BINARY_DIR}/catcheye-vision-runtime"
+    "${CATCHEYE_VISION_SDK_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}/catcheye-vision-sdk"
 )
 
 find_package(OpenCV REQUIRED)
@@ -229,11 +219,11 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(DIRECTORY ${CATCHEYE_VISION_INPUT_SOURCE_DIR}/include/
+install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-input/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(DIRECTORY ${CATCHEYE_VISION_RUNTIME_SOURCE_DIR}/include/
+install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-runtime/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
