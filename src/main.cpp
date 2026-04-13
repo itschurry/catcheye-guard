@@ -1,207 +1,24 @@
+#include <exception>
 #include <iostream>
-#include <filesystem>
-#include <memory>
-#include <span>
-#include <string>
-#include <vector>
-
-#include "catcheye/input/frame_source.hpp"
-#include "catcheye/core/pipeline.hpp"
-#include "catcheye/guard/roi/roi_repository.hpp"
-#include "catcheye/guard/roi/roi_validation.hpp"
+#include "guard/guard_app.hpp"
 #include "catcheye/utils/logger.hpp"
-
-namespace {
-
-std::string resolve_default_model_path(const char* executable_path, const std::string& relative_path) {
-    namespace fs = std::filesystem;
-
-    std::vector<fs::path> candidates;
-    if (executable_path != nullptr && *executable_path != '\0') {
-        const fs::path executable = fs::absolute(executable_path);
-        const fs::path executable_dir = executable.parent_path();
-        candidates.emplace_back(executable_dir / ".." / "models" / relative_path);
-        candidates.emplace_back(executable_dir / "models" / relative_path);
-    }
-    candidates.emplace_back(fs::current_path() / "models" / relative_path);
-
-    for (const fs::path& candidate : candidates) {
-        if (fs::exists(candidate)) {
-            return candidate.lexically_normal().string();
-        }
-    }
-
-    return (fs::current_path() / "models" / relative_path).lexically_normal().string();
-}
-
-} // namespace
 
 int main(int argc, char** argv) {
     catcheye::initialize_logging("catcheye_guard", "log");
-
-    catcheye::PipelineConfig config;
-    catcheye::input::InputSourceConfig input_config;
-
-    config.detector.param_path = resolve_default_model_path(argv[0], "yolo26n_ncnn_model/model.ncnn.param");
-    config.detector.bin_path = resolve_default_model_path(argv[0], "yolo26n_ncnn_model/model.ncnn.bin");
-    config.detector.metadata_path = resolve_default_model_path(argv[0], "yolo26n_ncnn_model/metadata.yaml");
-    std::string roi_config_path = resolve_default_model_path(argv[0], "roi_cam_default.json");
-
-    // Parse named flags first
-    const std::span<char* const> ARGS(argv, static_cast<std::size_t>(argc));
-    std::vector<std::string> positional_args;
-    bool input_mode_selected = false;
-    for (std::size_t i = 1; i < ARGS.size(); ++i) {
-        std::string arg(ARGS[i]);
-        if (arg == "--image" && i + 1 < ARGS.size()) {
-            if (input_mode_selected) {
-                std::cerr << "input mode flags are mutually exclusive\n";
-                catcheye::shutdown_logging();
-                return 1;
-            }
-            input_mode_selected = true;
-            input_config.type = catcheye::input::InputSourceType::ImageFile;
-            input_config.uri = ARGS[++i];
-        } else if (arg == "--video" && i + 1 < ARGS.size()) {
-            if (input_mode_selected) {
-                std::cerr << "input mode flags are mutually exclusive\n";
-                catcheye::shutdown_logging();
-                return 1;
-            }
-            input_mode_selected = true;
-            input_config.type = catcheye::input::InputSourceType::VideoFile;
-            input_config.uri = ARGS[++i];
-        } else if (arg == "--camera") {
-            if (input_mode_selected) {
-                std::cerr << "input mode flags are mutually exclusive\n";
-                catcheye::shutdown_logging();
-                return 1;
-            }
-            input_mode_selected = true;
-            input_config.type = catcheye::input::InputSourceType::Camera;
-        } else if (arg == "--camera-pipeline" && i + 1 < ARGS.size()) {
-            input_config.camera_pipeline = ARGS[++i];
-        } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" || arg == "--num-threads") {
-            std::cerr << "missing value for flag: " << arg << '\n';
-            catcheye::shutdown_logging();
-            return 1;
-        } else if (arg == "--stream") {
-            config.stream_preview = true;
-            config.render_preview = false;
-            // Optional: next arg may be a port number (if not another flag)
-            if (i + 1 < ARGS.size() && ARGS[i + 1][0] != '-') {
-                ++i;
-                std::string port_str(ARGS[i]);
-                try {
-                    config.stream_config.port = std::stoi(port_str);
-                } catch (const std::exception&) {
-                    std::cerr << "invalid --stream port value: " << port_str << '\n';
-                    catcheye::shutdown_logging();
-                    return 1;
-                }
-            }
-        } else if (arg == "--stream-with-preview") {
-            config.stream_preview = true;
-            config.render_preview = true;
-        } else if (arg == "--num-threads" && i + 1 < ARGS.size()) {
-            ++i;
-            std::string num_threads_str(ARGS[i]);
-            try {
-                config.detector.num_threads = std::stoi(num_threads_str);
-            } catch (const std::exception&) {
-                std::cerr << "invalid --num-threads value: " << num_threads_str << '\n';
-                catcheye::shutdown_logging();
-                return 1;
-            }
-        } else {
-            positional_args.push_back(arg);
-        }
-    }
-
-    if ((input_config.type == catcheye::input::InputSourceType::ImageFile
-         || input_config.type == catcheye::input::InputSourceType::VideoFile)
-        && !input_config.camera_pipeline.empty()) {
-        std::cerr << "--camera-pipeline is only valid with --camera\n";
-        catcheye::shutdown_logging();
-        return 1;
-    }
-
-    if ((input_config.type == catcheye::input::InputSourceType::ImageFile
-         || input_config.type == catcheye::input::InputSourceType::VideoFile)
-        && input_config.uri.empty()) {
-        std::cerr << "input path is required for --image or --video\n";
-        catcheye::shutdown_logging();
-        return 1;
-    }
-
-    // Apply positional ARGS: [param_path] [bin_path] [metadata_path] [roi_config_path]
-    if (positional_args.size() > 0) {
-        config.detector.param_path = positional_args[0];
-    }
-    if (positional_args.size() > 1) {
-        config.detector.bin_path = positional_args[1];
-    }
-    if (positional_args.size() > 2) {
-        config.detector.metadata_path = positional_args[2];
-    }
-    if (positional_args.size() > 3) {
-        roi_config_path = positional_args[3];
-    }
-
-    if (config.detector.param_path.empty() || config.detector.bin_path.empty()) {
+    try {
+        const int exit_code = catcheye::guard::run_app(argc, argv);
         if (const auto log = catcheye::logger()) {
-            log->error("model paths are required");
-        } else {
-            std::cerr << "Model paths are required.\n";
+            log->info("catcheye-guard exiting with code {}", exit_code);
         }
         catcheye::shutdown_logging();
-        return 1;
-    }
-
-    const auto roi_parse_result = catcheye::guard::roi::RoiRepository::load_from_file(roi_config_path);
-    if (!roi_parse_result.success) {
+        return exit_code;
+    } catch (const std::exception& exception) {
         if (const auto log = catcheye::logger()) {
-            log->error("failed to load ROI config '{}'", roi_config_path);
-            for (const std::string& error : roi_parse_result.errors) {
-                log->error("ROI parse error: {}", error);
-            }
+            log->error("startup failed: {}", exception.what());
         } else {
-            std::cerr << "Failed to load ROI config: " << roi_config_path << '\n';
+            std::cerr << exception.what() << '\n';
         }
         catcheye::shutdown_logging();
         return 1;
     }
-
-    const auto roi_validation_result = catcheye::guard::roi::validate_camera_roi_config(roi_parse_result.config);
-    if (!roi_validation_result.valid) {
-        if (const auto log = catcheye::logger()) {
-            log->error("ROI config '{}' failed validation", roi_config_path);
-            for (const auto& issue : roi_validation_result.issues) {
-                log->error("ROI validation issue: zone_index={}, point_index={}, message={}", issue.zone_index, issue.point_index,
-                           issue.message);
-            }
-        }
-        catcheye::shutdown_logging();
-        return 1;
-    }
-
-    config.roi_enabled = true;
-    config.roi_auto_reload = input_config.type == catcheye::input::InputSourceType::Camera;
-    config.roi_config_path = roi_config_path;
-    config.roi_config = roi_parse_result.config;
-    config.stream_config.roi_config_path = roi_config_path;
-
-    if (const auto log = catcheye::logger()) {
-        log->info("catcheye-guard starting (ROI='{}', stream={}, preview={})", roi_config_path, config.stream_preview,
-                  config.render_preview);
-    }
-
-    std::unique_ptr<catcheye::input::FrameSource> frame_source = catcheye::input::create_frame_source(std::move(input_config));
-    catcheye::Pipeline pipeline(config, std::move(frame_source));
-    const int exit_code = pipeline.run();
-    if (const auto log = catcheye::logger()) {
-        log->info("catcheye-guard exiting with code {}", exit_code);
-    }
-    catcheye::shutdown_logging();
-    return exit_code;
 }

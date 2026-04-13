@@ -1,0 +1,53 @@
+#pragma once
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "catcheye/core/frame_streamer.hpp"
+#include "catcheye/input/frame_source.hpp"
+#include "catcheye/runtime/frame_processing_runner.hpp"
+#include "guard/guard_processor_config.hpp"
+
+namespace catcheye::guard {
+
+struct AppOptions {
+    catcheye::input::InputSourceConfig input;
+    bool stream_preview = false;
+    bool render_preview = true;
+    int stream_port = 0;
+    int num_threads = 2;
+    std::vector<std::string> positional_args;
+};
+
+struct DefaultPaths {
+    std::string param_path;
+    std::string bin_path;
+    std::string metadata_path;
+    std::string roi_config_path;
+};
+
+struct LoadedRoiConfig {
+    std::string path;
+    catcheye::guard::roi::CameraRoiConfig config;
+};
+
+struct AppBootstrap {
+    GuardProcessorConfig processor_config;
+    catcheye::runtime::RuntimeConfig runtime_config;
+    FrameStreamerConfig stream_config;
+    bool stream_preview = false;
+    std::unique_ptr<catcheye::input::FrameSource> source;
+};
+
+AppOptions parse_app_options(int argc, char** argv);
+DefaultPaths resolve_default_paths(const char* executable_path);
+LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path);
+AppBootstrap build_app_bootstrap(
+    const AppOptions& options,
+    const DefaultPaths& default_paths,
+    const LoadedRoiConfig& loaded_roi_config);
+
+int run_app(int argc, char** argv);
+
+} // namespace catcheye::guard

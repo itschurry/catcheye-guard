@@ -1,3 +1,6 @@
 [submodule "third_party/catcheye-vision-input"]
 	path = third_party/catcheye-vision-input
 	url = https://github.com/itschurry/catcheye-vision-input.git
+[submodule "third_party/catcheye-vision-runtime"]
+	path = third_party/catcheye-vision-runtime
+	url = https://github.com/itschurry/catcheye-vision-runtime.git

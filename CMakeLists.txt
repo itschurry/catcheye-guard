@@ -58,6 +58,16 @@ add_subdirectory(
     "${CMAKE_CURRENT_BINARY_DIR}/catcheye-vision-input"
 )
 
+set(CATCHEYE_VISION_RUNTIME_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/catcheye-vision-runtime")
+if(NOT EXISTS "${CATCHEYE_VISION_RUNTIME_SOURCE_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "catcheye-vision-runtime repo not found at ${CATCHEYE_VISION_RUNTIME_SOURCE_DIR}")
+endif()
+
+add_subdirectory(
+    "${CATCHEYE_VISION_RUNTIME_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}/catcheye-vision-runtime"
+)
+
 find_package(OpenCV REQUIRED)
 
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
@@ -102,6 +112,8 @@ target_include_directories(catcheye_guard
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
         ${OpenCV_INCLUDE_DIRS}
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_compile_features(catcheye_guard PUBLIC cxx_std_20)
@@ -115,6 +127,7 @@ target_compile_definitions(catcheye_guard
 target_link_libraries(catcheye_guard
     PUBLIC
         catcheye::vision_input
+        catcheye::vision_runtime
         ncnn
         spdlog::spdlog
     PRIVATE
@@ -133,6 +146,11 @@ if(CATCHEYE_GUARD_BUILD_APP AND EXISTS "${CATCHEYE_GUARD_MAIN_SOURCE}")
     target_link_libraries(catcheye-guard
         PRIVATE
             catcheye::guard
+    )
+
+    target_include_directories(catcheye-guard
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
 
     target_compile_features(catcheye-guard PRIVATE cxx_std_20)
@@ -160,6 +178,7 @@ if(CATCHEYE_GUARD_BUILD_TESTS)
         target_include_directories(catcheye_guard_tests
             PRIVATE
                 ${CMAKE_CURRENT_SOURCE_DIR}/include
+                ${CMAKE_CURRENT_SOURCE_DIR}/src
         )
 
         target_compile_definitions(catcheye_guard_tests
@@ -186,6 +205,13 @@ install(TARGETS catcheye_vision_input
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+install(TARGETS catcheye_vision_runtime
+    EXPORT catcheye_guard_targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
 install(TARGETS catcheye_guard
     EXPORT catcheye_guard_targets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -204,6 +230,10 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
 )
 
 install(DIRECTORY ${CATCHEYE_VISION_INPUT_SOURCE_DIR}/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY ${CATCHEYE_VISION_RUNTIME_SOURCE_DIR}/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
