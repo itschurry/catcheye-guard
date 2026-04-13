@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "catcheye/core/frame_source.hpp"
+#include "catcheye/input/frame_source.hpp"
 #include "catcheye/core/frame_streamer.hpp"
 #include "catcheye/guard/detector.hpp"
 #include "catcheye/guard/roi/camera_roi_config.hpp"
@@ -27,13 +27,13 @@ struct PipelineConfig {
 
 class Pipeline {
    public:
-    Pipeline(PipelineConfig config, std::unique_ptr<FrameSource> source);
+    Pipeline(PipelineConfig config, std::unique_ptr<catcheye::input::FrameSource> source);
 
     int run();
 
    private:
     PipelineConfig config_;
-    std::unique_ptr<FrameSource> source_;
+    std::unique_ptr<catcheye::input::FrameSource> source_;
     Detector detector_;
     std::unique_ptr<FrameStreamer> frame_streamer_;
 };

@@ -1,0 +1,3 @@
+[submodule "third_party/catcheye-vision-input"]
+	path = third_party/catcheye-vision-input
+	url = https://github.com/itschurry/catcheye-vision-input.git

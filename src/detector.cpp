@@ -262,7 +262,7 @@ bool Detector::is_initialized() const {
     return initialized_;
 }
 
-std::vector<Detection> Detector::detect(const Frame& frame) {
+std::vector<Detection> Detector::detect(const catcheye::input::Frame& frame) {
     if (!initialized_ || frame.empty()) {
         return {};
     }

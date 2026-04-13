@@ -322,7 +322,7 @@ void draw_detections(
 
 } // namespace
 
-Pipeline::Pipeline(PipelineConfig config, std::unique_ptr<FrameSource> source)
+Pipeline::Pipeline(PipelineConfig config, std::unique_ptr<catcheye::input::FrameSource> source)
     : config_(std::move(config)),
       source_(std::move(source)),
       detector_(config_.detector) {
@@ -407,13 +407,13 @@ int Pipeline::run() {
         }
     }
 
-    Frame frame;
+    catcheye::input::Frame frame;
     std::uint64_t frame_count = 0;
     bool roi_frame_size_warning_emitted = false;
     std::vector<Detection> cached_detections;
     while (true) {
-        const FrameReadStatus read_status = source_->read(frame);
-        if (read_status == FrameReadStatus::EndOfStream) {
+        const catcheye::input::FrameReadStatus read_status = source_->read(frame);
+        if (read_status == catcheye::input::FrameReadStatus::EndOfStream) {
             if (const auto log = logger()) {
                 log->info("input source reached end: '{}'", source_->describe());
             }
@@ -430,7 +430,7 @@ int Pipeline::run() {
             }
             break;
         }
-        if (read_status == FrameReadStatus::Error) {
+        if (read_status == catcheye::input::FrameReadStatus::Error) {
             if (const auto log = logger()) {
                 log->warn("stopping pipeline because frame read failed from '{}'", source_->describe());
             }

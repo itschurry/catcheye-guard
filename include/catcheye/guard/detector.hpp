@@ -7,7 +7,7 @@
 #include <net.h>
 
 #include "catcheye/types/bounding_box.hpp"
-#include "catcheye/types/frame.hpp"
+#include "catcheye/input/frame.hpp"
 
 namespace catcheye {
 
@@ -37,7 +37,7 @@ class Detector {
 
     bool initialize();
     bool is_initialized() const;
-    std::vector<Detection> detect(const Frame& frame);
+    std::vector<Detection> detect(const catcheye::input::Frame& frame);
     std::string class_name(int class_id) const;
 
    private:

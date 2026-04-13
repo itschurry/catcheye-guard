@@ -48,6 +48,16 @@ endif()
 # ---------------------------------------------------------------------------
 # Dependencies
 # ---------------------------------------------------------------------------
+set(CATCHEYE_VISION_INPUT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/catcheye-vision-input")
+if(NOT EXISTS "${CATCHEYE_VISION_INPUT_SOURCE_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "catcheye-vision-input repo not found at ${CATCHEYE_VISION_INPUT_SOURCE_DIR}")
+endif()
+
+add_subdirectory(
+    "${CATCHEYE_VISION_INPUT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}/catcheye-vision-input"
+)
+
 find_package(OpenCV REQUIRED)
 
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
@@ -104,7 +114,7 @@ target_compile_definitions(catcheye_guard
 
 target_link_libraries(catcheye_guard
     PUBLIC
-        ${OpenCV_LIBS}
+        catcheye::vision_input
         ncnn
         spdlog::spdlog
     PRIVATE
@@ -169,6 +179,13 @@ endif()
 # ---------------------------------------------------------------------------
 include(GNUInstallDirs)
 
+install(TARGETS catcheye_vision_input
+    EXPORT catcheye_guard_targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
 install(TARGETS catcheye_guard
     EXPORT catcheye_guard_targets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -183,6 +200,10 @@ if(TARGET catcheye-guard)
 endif()
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY ${CATCHEYE_VISION_INPUT_SOURCE_DIR}/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 

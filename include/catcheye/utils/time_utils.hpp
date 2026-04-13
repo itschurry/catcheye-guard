@@ -2,12 +2,12 @@
 
 #include <chrono>
 
-#include "catcheye/types/timestamp.hpp"
+#include "catcheye/input/timestamp.hpp"
 
 namespace catcheye {
 
-inline Timestamp now_millis() {
-    return static_cast<Timestamp>(
+inline catcheye::input::Timestamp now_millis() {
+    return static_cast<catcheye::input::Timestamp>(
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now().time_since_epoch())
             .count());

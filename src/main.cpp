@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "catcheye/core/frame_source.hpp"
+#include "catcheye/input/frame_source.hpp"
 #include "catcheye/core/pipeline.hpp"
 #include "catcheye/guard/roi/roi_repository.hpp"
 #include "catcheye/guard/roi/roi_validation.hpp"
@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
     catcheye::initialize_logging("catcheye_guard", "log");
 
     catcheye::PipelineConfig config;
-    catcheye::InputSourceConfig input_config;
+    catcheye::input::InputSourceConfig input_config;
 
     config.detector.param_path = resolve_default_model_path(argv[0], "yolo26n_ncnn_model/model.ncnn.param");
     config.detector.bin_path = resolve_default_model_path(argv[0], "yolo26n_ncnn_model/model.ncnn.bin");
@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
                 return 1;
             }
             input_mode_selected = true;
-            input_config.type = catcheye::InputSourceType::ImageFile;
+            input_config.type = catcheye::input::InputSourceType::ImageFile;
             input_config.uri = ARGS[++i];
         } else if (arg == "--video" && i + 1 < ARGS.size()) {
             if (input_mode_selected) {
@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
                 return 1;
             }
             input_mode_selected = true;
-            input_config.type = catcheye::InputSourceType::VideoFile;
+            input_config.type = catcheye::input::InputSourceType::VideoFile;
             input_config.uri = ARGS[++i];
         } else if (arg == "--camera") {
             if (input_mode_selected) {
@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
                 return 1;
             }
             input_mode_selected = true;
-            input_config.type = catcheye::InputSourceType::Camera;
+            input_config.type = catcheye::input::InputSourceType::Camera;
         } else if (arg == "--camera-pipeline" && i + 1 < ARGS.size()) {
             input_config.camera_pipeline = ARGS[++i];
         } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" || arg == "--num-threads") {
@@ -118,16 +118,16 @@ int main(int argc, char** argv) {
         }
     }
 
-    if ((input_config.type == catcheye::InputSourceType::ImageFile
-         || input_config.type == catcheye::InputSourceType::VideoFile)
+    if ((input_config.type == catcheye::input::InputSourceType::ImageFile
+         || input_config.type == catcheye::input::InputSourceType::VideoFile)
         && !input_config.camera_pipeline.empty()) {
         std::cerr << "--camera-pipeline is only valid with --camera\n";
         catcheye::shutdown_logging();
         return 1;
     }
 
-    if ((input_config.type == catcheye::InputSourceType::ImageFile
-         || input_config.type == catcheye::InputSourceType::VideoFile)
+    if ((input_config.type == catcheye::input::InputSourceType::ImageFile
+         || input_config.type == catcheye::input::InputSourceType::VideoFile)
         && input_config.uri.empty()) {
         std::cerr << "input path is required for --image or --video\n";
         catcheye::shutdown_logging();
@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
     }
 
     config.roi_enabled = true;
-    config.roi_auto_reload = input_config.type == catcheye::InputSourceType::Camera;
+    config.roi_auto_reload = input_config.type == catcheye::input::InputSourceType::Camera;
     config.roi_config_path = roi_config_path;
     config.roi_config = roi_parse_result.config;
     config.stream_config.roi_config_path = roi_config_path;
@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
                   config.render_preview);
     }
 
-    std::unique_ptr<catcheye::FrameSource> frame_source = catcheye::create_frame_source(std::move(input_config));
+    std::unique_ptr<catcheye::input::FrameSource> frame_source = catcheye::input::create_frame_source(std::move(input_config));
     catcheye::Pipeline pipeline(config, std::move(frame_source));
     const int exit_code = pipeline.run();
     if (const auto log = catcheye::logger()) {

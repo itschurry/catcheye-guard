@@ -7,16 +7,16 @@
 
 #include <opencv2/core.hpp>
 
-#include "catcheye/core/frame_source.hpp"
+#include "catcheye/input/frame_source.hpp"
 #include "catcheye/core/pipeline.hpp"
 
 namespace fs = std::filesystem;
 
 namespace {
 
-class FakeFrameSource final : public catcheye::FrameSource {
+class FakeFrameSource final : public catcheye::input::FrameSource {
    public:
-    explicit FakeFrameSource(std::vector<catcheye::FrameReadStatus> statuses)
+    explicit FakeFrameSource(std::vector<catcheye::input::FrameReadStatus> statuses)
         : statuses_(std::move(statuses)) {}
 
     bool open() override
@@ -30,16 +30,16 @@ class FakeFrameSource final : public catcheye::FrameSource {
         return opened_;
     }
 
-    catcheye::FrameReadStatus read(catcheye::Frame& frame) override
+    catcheye::input::FrameReadStatus read(catcheye::input::Frame& frame) override
     {
         if (!opened_ || index_ >= statuses_.size()) {
-            return catcheye::FrameReadStatus::EndOfStream;
+            return catcheye::input::FrameReadStatus::EndOfStream;
         }
 
-        const catcheye::FrameReadStatus status = statuses_[index_++];
-        if (status == catcheye::FrameReadStatus::Ok) {
+        const catcheye::input::FrameReadStatus status = statuses_[index_++];
+        if (status == catcheye::input::FrameReadStatus::Ok) {
             frame.image = cv::Mat(32, 32, CV_8UC3, cv::Scalar(0, 0, 0)).clone();
-            frame.format = catcheye::PixelFormat::BGR;
+            frame.format = catcheye::input::PixelFormat::BGR;
             frame.timestamp = 1;
         }
         return status;
@@ -56,7 +56,7 @@ class FakeFrameSource final : public catcheye::FrameSource {
     }
 
    private:
-    std::vector<catcheye::FrameReadStatus> statuses_;
+    std::vector<catcheye::input::FrameReadStatus> statuses_;
     std::size_t index_ = 0;
     bool opened_ = false;
 };
@@ -82,9 +82,9 @@ catcheye::PipelineConfig make_pipeline_config()
 TEST_CASE(pipeline_returns_zero_after_processing_frames_before_end_of_stream)
 {
     auto source = std::make_unique<FakeFrameSource>(
-        std::vector<catcheye::FrameReadStatus> {
-            catcheye::FrameReadStatus::Ok,
-            catcheye::FrameReadStatus::EndOfStream,
+        std::vector<catcheye::input::FrameReadStatus> {
+            catcheye::input::FrameReadStatus::Ok,
+            catcheye::input::FrameReadStatus::EndOfStream,
         });
 
     catcheye::Pipeline pipeline(make_pipeline_config(), std::move(source));
@@ -94,8 +94,8 @@ TEST_CASE(pipeline_returns_zero_after_processing_frames_before_end_of_stream)
 TEST_CASE(pipeline_returns_one_on_read_error)
 {
     auto source = std::make_unique<FakeFrameSource>(
-        std::vector<catcheye::FrameReadStatus> {
-            catcheye::FrameReadStatus::Error,
+        std::vector<catcheye::input::FrameReadStatus> {
+            catcheye::input::FrameReadStatus::Error,
         });
 
     catcheye::Pipeline pipeline(make_pipeline_config(), std::move(source));
@@ -105,8 +105,8 @@ TEST_CASE(pipeline_returns_one_on_read_error)
 TEST_CASE(pipeline_returns_one_when_source_ends_before_first_frame)
 {
     auto source = std::make_unique<FakeFrameSource>(
-        std::vector<catcheye::FrameReadStatus> {
-            catcheye::FrameReadStatus::EndOfStream,
+        std::vector<catcheye::input::FrameReadStatus> {
+            catcheye::input::FrameReadStatus::EndOfStream,
         });
 
     catcheye::Pipeline pipeline(make_pipeline_config(), std::move(source));
