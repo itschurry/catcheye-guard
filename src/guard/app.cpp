@@ -1,4 +1,4 @@
-#include "guard/guard_app.hpp"
+#include "guard/app.hpp"
 
 #include <exception>
 #include <filesystem>
@@ -14,7 +14,7 @@
 #include "catcheye/runtime/frame_processing_runner.hpp"
 #include "catcheye/transport/websocket_publisher.hpp"
 #include "catcheye/utils/logger.hpp"
-#include "guard/guard_processor.hpp"
+#include "guard/processor.hpp"
 
 namespace catcheye::guard {
 namespace {

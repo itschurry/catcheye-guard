@@ -5,7 +5,7 @@
 
 #include "catcheye/protocol/frame_message.hpp"
 #include "catcheye/runtime/frame_processor.hpp"
-#include "guard/guard_processor_config.hpp"
+#include "guard/processor_config.hpp"
 #include "guard/detection_postprocess.hpp"
 
 namespace catcheye {

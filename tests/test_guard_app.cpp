@@ -4,7 +4,7 @@
 #include <fstream>
 #include <stdexcept>
 
-#include "guard/guard_app.hpp"
+#include "guard/app.hpp"
 
 namespace fs = std::filesystem;
 

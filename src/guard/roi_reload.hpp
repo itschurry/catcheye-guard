@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "guard/guard_processor_config.hpp"
+#include "guard/processor_config.hpp"
 
 namespace catcheye {
 

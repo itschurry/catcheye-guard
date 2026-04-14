@@ -8,7 +8,7 @@
 #include "catcheye/roi/camera_roi_config.hpp"
 #include "catcheye/runtime/frame_processing_runner.hpp"
 #include "catcheye/transport/websocket_publisher.hpp"
-#include "guard/guard_processor_config.hpp"
+#include "guard/processor_config.hpp"
 
 namespace catcheye::guard {
 

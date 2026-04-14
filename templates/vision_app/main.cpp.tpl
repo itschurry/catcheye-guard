@@ -1,14 +1,16 @@
 #include <exception>
 #include <iostream>
-#include "guard/app.hpp"
-#include "catcheye/utils/logger.hpp"
 
-int main(int argc, char** argv) {
-    catcheye::initialize_logging("catcheye_guard", "log");
+#include "catcheye/utils/logger.hpp"
+#include "__APP_NS__/__APP_NS___app.hpp"
+
+int main(int argc, char** argv)
+{
+    catcheye::initialize_logging("__APP_SLUG__", "log");
     try {
-        const int exit_code = catcheye::guard::run_app(argc, argv);
+        const int exit_code = catcheye::__APP_NS__::run_app(argc, argv);
         if (const auto log = catcheye::logger()) {
-            log->info("catcheye-guard exiting with code {}", exit_code);
+            log->info("__APP_SLUG__ exiting with code {}", exit_code);
         }
         catcheye::shutdown_logging();
         return exit_code;

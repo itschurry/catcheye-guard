@@ -1,7 +1,7 @@
 #include "test_support.hpp"
 
 #include "catcheye/roi/camera_roi_config.hpp"
-#include "guard/guard_processor.hpp"
+#include "guard/processor.hpp"
 
 TEST_CASE(guard_processor_rejects_invalid_roi_config_before_detector_init)
 {
