@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "catcheye/guard/detector.hpp"
+#include "guard/detector.hpp"
 #include "catcheye/roi/camera_roi_config.hpp"
 #include "catcheye/roi/roi_evaluator.hpp"
 

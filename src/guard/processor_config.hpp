@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "catcheye/guard/detector.hpp"
+#include "guard/detector.hpp"
 #include "catcheye/roi/camera_roi_config.hpp"
 
 namespace catcheye {

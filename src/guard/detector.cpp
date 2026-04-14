@@ -1,4 +1,4 @@
-#include "catcheye/guard/detector.hpp"
+#include "guard/detector.hpp"
 
 #include <algorithm>
 #include <cmath>

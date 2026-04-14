@@ -6,8 +6,8 @@
 
 #include <net.h>
 
-#include "catcheye/types/bounding_box.hpp"
 #include "catcheye/input/frame.hpp"
+#include "guard/bounding_box.hpp"
 
 namespace catcheye {
 
@@ -32,7 +32,7 @@ struct DetectorConfig {
 };
 
 class Detector {
-   public:
+public:
     explicit Detector(DetectorConfig config = {});
 
     bool initialize();
@@ -40,7 +40,7 @@ class Detector {
     std::vector<Detection> detect(const catcheye::input::Frame& frame);
     std::string class_name(int class_id) const;
 
-   private:
+private:
     DetectorConfig config_;
     ncnn::Net net_;
     std::map<int, std::string> class_names_;
