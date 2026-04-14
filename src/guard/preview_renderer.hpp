@@ -2,11 +2,12 @@
 
 #include <opencv2/core/mat.hpp>
 
+#include "catcheye/roi/camera_roi_config.hpp"
 #include "guard/detection_postprocess.hpp"
 
 namespace catcheye {
 
-void draw_roi_zones(cv::Mat& image, const catcheye::guard::roi::CameraRoiConfig& roi_config);
+void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_config);
 
 void draw_detections(
     cv::Mat& image,

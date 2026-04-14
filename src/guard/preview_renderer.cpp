@@ -10,7 +10,7 @@
 namespace catcheye {
 namespace {
 
-using RoiEvaluationStatus = catcheye::guard::roi::EvaluationStatus;
+using RoiEvaluationStatus = catcheye::roi::EvaluationStatus;
 
 cv::Rect to_rect(const BoundingBox& box) {
     return cv::Rect(
@@ -20,7 +20,7 @@ cv::Rect to_rect(const BoundingBox& box) {
         static_cast<int>(box.height));
 }
 
-cv::Point to_cv_point(const catcheye::guard::roi::Point& point) {
+cv::Point to_cv_point(const catcheye::roi::Point& point) {
     return cv::Point(
         static_cast<int>(std::lround(point.x)),
         static_cast<int>(std::lround(point.y)));
@@ -62,7 +62,7 @@ std::string roi_status_text(const EvaluatedDetection& detection, bool roi_enable
 
 } // namespace
 
-void draw_roi_zones(cv::Mat& image, const catcheye::guard::roi::CameraRoiConfig& roi_config) {
+void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_config) {
     for (const bool draw_enabled : {true, false}) {
         const double fill_alpha = draw_enabled ? 0.20 : 0.10;
         cv::Mat fill_overlay;

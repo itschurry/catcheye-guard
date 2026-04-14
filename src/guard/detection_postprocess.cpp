@@ -3,10 +3,10 @@
 namespace catcheye {
 namespace {
 
-catcheye::guard::roi::EvaluationResult evaluate_detection_roi(
+catcheye::roi::EvaluationResult evaluate_detection_roi(
     const Detection& detection,
-    const catcheye::guard::roi::CameraRoiConfig& roi_config) {
-    return catcheye::guard::roi::evaluate_bbox_fully_inside(
+    const catcheye::roi::CameraRoiConfig& roi_config) {
+    return catcheye::roi::evaluate_bbox_fully_inside(
         static_cast<double>(detection.box.x),
         static_cast<double>(detection.box.y),
         static_cast<double>(detection.box.width),
@@ -38,16 +38,16 @@ std::vector<Detection> filter_detections(
 std::vector<EvaluatedDetection> evaluate_detections(
     const std::vector<Detection>& detections,
     bool roi_enabled,
-    const catcheye::guard::roi::CameraRoiConfig& roi_config) {
+    const catcheye::roi::CameraRoiConfig& roi_config) {
     std::vector<EvaluatedDetection> evaluated;
     evaluated.reserve(detections.size());
 
     for (const Detection& detection : detections) {
-        catcheye::guard::roi::EvaluationResult roi_result;
+        catcheye::roi::EvaluationResult roi_result;
         if (roi_enabled) {
             roi_result = evaluate_detection_roi(detection, roi_config);
         } else {
-            roi_result = {catcheye::guard::roi::EvaluationStatus::Allowed, "ROI disabled"};
+            roi_result = {catcheye::roi::EvaluationStatus::Allowed, "ROI disabled"};
         }
         evaluated.push_back(EvaluatedDetection {detection, std::move(roi_result)});
     }

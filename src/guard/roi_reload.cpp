@@ -4,8 +4,8 @@
 #include <iterator>
 #include <string>
 
-#include "catcheye/guard/roi/roi_repository.hpp"
-#include "catcheye/guard/roi/roi_validation.hpp"
+#include "catcheye/roi/roi_repository.hpp"
+#include "catcheye/roi/roi_validation.hpp"
 #include "catcheye/utils/logger.hpp"
 
 namespace catcheye {
@@ -64,7 +64,7 @@ bool try_reload_roi_config(
         log->info("detected ROI config change, reloading '{}'", config.roi_config_path);
     }
 
-    const auto parse_result = catcheye::guard::roi::RoiRepository::from_json_string(current_text);
+    const auto parse_result = catcheye::roi::RoiRepository::from_json_string(current_text);
     if (!parse_result.success) {
         if (const auto log = logger()) {
             log->warn("ROI reload failed, keeping previous config");
@@ -75,7 +75,7 @@ bool try_reload_roi_config(
         return false;
     }
 
-    const auto validation_result = catcheye::guard::roi::validate_camera_roi_config(parse_result.config);
+    const auto validation_result = catcheye::roi::validate_camera_roi_config(parse_result.config);
     if (!validation_result.valid) {
         if (const auto log = logger()) {
             log->warn("reloaded ROI config is invalid, keeping previous config");

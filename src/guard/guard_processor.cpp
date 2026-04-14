@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "catcheye/protocol/frame_message.hpp"
-#include "catcheye/guard/roi/roi_validation.hpp"
+#include "catcheye/roi/roi_validation.hpp"
 #include "catcheye/utils/logger.hpp"
 #include "guard/preview_renderer.hpp"
 #include "guard/roi_reload.hpp"
@@ -15,7 +15,7 @@
 namespace catcheye {
 namespace {
 
-using RoiEvaluationStatus = catcheye::guard::roi::EvaluationStatus;
+using RoiEvaluationStatus = catcheye::roi::EvaluationStatus;
 constexpr std::uint64_t ROI_RELOAD_INTERVAL_FRAMES = 15;
 
 std::string roi_status_to_string(RoiEvaluationStatus status)
@@ -105,7 +105,7 @@ GuardProcessor::GuardProcessor(GuardProcessorConfig config)
 bool GuardProcessor::initialize()
 {
     if (config_.roi_enabled) {
-        const auto validation = catcheye::guard::roi::validate_camera_roi_config(config_.roi_config);
+        const auto validation = catcheye::roi::validate_camera_roi_config(config_.roi_config);
         if (!validation.valid) {
             if (const auto log = logger()) {
                 log->error("ROI config is invalid with {} issue(s)", validation.issues.size());

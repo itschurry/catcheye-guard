@@ -9,8 +9,8 @@
 #include <utility>
 #include <vector>
 
-#include "catcheye/guard/roi/roi_repository.hpp"
-#include "catcheye/guard/roi/roi_validation.hpp"
+#include "catcheye/roi/roi_repository.hpp"
+#include "catcheye/roi/roi_validation.hpp"
 #include "catcheye/runtime/frame_processing_runner.hpp"
 #include "catcheye/transport/websocket_publisher.hpp"
 #include "catcheye/utils/logger.hpp"
@@ -130,12 +130,12 @@ DefaultPaths resolve_default_paths(const char* executable_path)
 
 LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path)
 {
-    const auto roi_parse_result = roi::RoiRepository::load_from_file(roi_config_path);
+    const auto roi_parse_result = catcheye::roi::RoiRepository::load_from_file(roi_config_path);
     if (!roi_parse_result.success) {
         throw std::runtime_error("failed to load ROI config: " + roi_config_path);
     }
 
-    const auto roi_validation_result = roi::validate_camera_roi_config(roi_parse_result.config);
+    const auto roi_validation_result = catcheye::roi::validate_camera_roi_config(roi_parse_result.config);
     if (!roi_validation_result.valid) {
         throw std::runtime_error("ROI config failed validation: " + roi_config_path);
     }

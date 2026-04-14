@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "catcheye/input/frame_source.hpp"
+#include "catcheye/roi/camera_roi_config.hpp"
 #include "catcheye/runtime/frame_processing_runner.hpp"
 #include "catcheye/transport/websocket_publisher.hpp"
 #include "guard/guard_processor_config.hpp"
@@ -29,7 +30,7 @@ struct DefaultPaths {
 
 struct LoadedRoiConfig {
     std::string path;
-    catcheye::guard::roi::CameraRoiConfig config;
+    catcheye::roi::CameraRoiConfig config;
 };
 
 struct AppBootstrap {

@@ -3,7 +3,7 @@
 #include <string>
 
 #include "catcheye/guard/detector.hpp"
-#include "catcheye/guard/roi/camera_roi_config.hpp"
+#include "catcheye/roi/camera_roi_config.hpp"
 
 namespace catcheye {
 
@@ -14,7 +14,7 @@ struct GuardProcessorConfig {
     bool roi_enabled = false;
     bool roi_auto_reload = true;
     std::string roi_config_path;
-    catcheye::guard::roi::CameraRoiConfig roi_config;
+    catcheye::roi::CameraRoiConfig roi_config;
 };
 
 } // namespace catcheye

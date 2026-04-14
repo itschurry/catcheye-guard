@@ -117,6 +117,7 @@ target_compile_definitions(catcheye_guard
 target_link_libraries(catcheye_guard
     PUBLIC
         catcheye::vision_input
+        catcheye::vision_roi
         catcheye::vision_protocol
         catcheye::vision_runtime
         catcheye::vision_transport
@@ -197,6 +198,13 @@ install(TARGETS catcheye_vision_input
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+install(TARGETS catcheye_vision_roi
+    EXPORT catcheye_guard_targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
 install(TARGETS catcheye_vision_protocol
     EXPORT catcheye_guard_targets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -236,6 +244,10 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
 )
 
 install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-input/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-roi/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
