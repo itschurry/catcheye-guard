@@ -17,7 +17,7 @@ services:
         USERNAME: ${USER:-appuser}
         HOME: ${HOME:-/home/${USER:-appuser}}
         TAG: ${TAG:-develop}
-        LD_LIBRARY_PATH: ${LD_LIBRARY_PATH:-}
+        # LD_LIBRARY_PATH: ${LD_LIBRARY_PATH:-}
 
     # 1. 네트워크 & IPC
     network_mode: host
@@ -28,12 +28,12 @@ services:
       - DISPLAY=:0
       - QT_X11_NO_MITSHM=1
       - XAUTHORITY=/tmp/.Xauthority
-      - LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/zed/lib:/usr/local/lib:${LD_LIBRARY_PATH:-}
       - TZ=Asia/Seoul
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
-      - IS_MASTER=${IS_MASTER:-0}
+      # - LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/zed/lib:/usr/local/lib:${LD_LIBRARY_PATH:-}
+      # - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      # - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      # - ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+      # - IS_MASTER=${IS_MASTER:-0}
       # - ROS_STATIC_PEERS=192.168.10.21;192.168.10.22;192.168.10.23;192.168.10.24
       # - ROS_STATIC_PEERS=192.168.10.11;192.168.10.12;192.168.10.13;192.168.10.14;192.168.10.15;192.168.10.16;192.168.10.17
 
