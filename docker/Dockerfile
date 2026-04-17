@@ -13,7 +13,21 @@ ARG HOME=/home/${USERNAME}
 # [시스템 패키지]
 RUN set -eux; \
     dpkg --add-architecture arm64; \
-    sed -i '/^Signed-By:/i Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources; \
+    printf '%s\n' \
+    'Types: deb' \
+    'URIs: http://ftp.kaist.ac.kr/ubuntu/' \
+    'Suites: noble noble-updates noble-backports' \
+    'Components: main universe restricted multiverse' \
+    'Architectures: amd64' \
+    'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
+    '' \
+    'Types: deb' \
+    'URIs: http://ftp.kaist.ac.kr/ubuntu/' \
+    'Suites: noble-security' \
+    'Components: main universe restricted multiverse' \
+    'Architectures: amd64' \
+    'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
+    > /etc/apt/sources.list.d/ubuntu.sources; \
     printf '%s\n' \
     'Types: deb' \
     'URIs: http://ports.ubuntu.com/ubuntu-ports/' \
@@ -163,9 +177,24 @@ RUN echo 'export GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0:
 # ncnn 빌드 / 설치
 WORKDIR $HOME
 RUN git clone --depth 1 https://github.com/Tencent/ncnn.git && \
-    cd ncnn && mkdir -p build && cd build && \
-    cmake -DNCNN_VULKAN=OFF -DNCNN_BUILD_TOOLS=OFF -DNCNN_BUILD_EXAMPLES=OFF .. && \
-    cmake --build . -j$(nproc) && sudo cmake --install . --prefix /usr/local/ && sudo ldconfig
+    cd ncnn && mkdir -p build-aarch64 && cd build-aarch64 && \
+    cmake -G Ninja \
+    -DCMAKE_SYSTEM_NAME=Linux \
+    -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+    -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc-13 \
+    -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++-13 \
+    -DCMAKE_FIND_ROOT_PATH=/usr/aarch64-linux-gnu \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/opt/ncnn-aarch64 \
+    -DNCNN_VULKAN=OFF \
+    -DNCNN_BUILD_TOOLS=OFF \
+    -DNCNN_BUILD_EXAMPLES=OFF \
+    .. && \
+    cmake --build . -j$(nproc) && sudo cmake --install . && sudo ldconfig
 
 
 # .bashrc 설정
