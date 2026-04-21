@@ -19,8 +19,7 @@
 namespace catcheye::guard {
 namespace {
 
-std::string resolve_default_model_path(const char* executable_path, const std::string& relative_path)
-{
+std::string resolve_default_model_path(const char* executable_path, const std::string& relative_path) {
     namespace fs = std::filesystem;
 
     std::vector<fs::path> candidates;
@@ -41,15 +40,13 @@ std::string resolve_default_model_path(const char* executable_path, const std::s
     return (fs::current_path() / "models" / relative_path).lexically_normal().string();
 }
 
-bool is_input_mode(const std::string& arg)
-{
+bool is_input_mode(const std::string& arg) {
     return arg == "--image" || arg == "--video" || arg == "--camera";
 }
 
 } // namespace
 
-AppOptions parse_app_options(int argc, char** argv)
-{
+AppOptions parse_app_options(int argc, char** argv) {
     AppOptions options;
 
     const std::span<char* const> args(argv, static_cast<std::size_t>(argc));
@@ -98,29 +95,30 @@ AppOptions parse_app_options(int argc, char** argv)
             throw std::runtime_error("missing value for flag: " + arg);
         } else if (is_input_mode(arg)) {
             throw std::runtime_error("input mode flags are mutually exclusive");
+        } else if (arg == "--mediapipe") {
+            options.detector_backend = DetectorBackend::MediaPipe;
         } else {
             options.positional_args.push_back(arg);
         }
     }
 
-    if ((options.input.type == catcheye::input::InputSourceType::ImageFile
-         || options.input.type == catcheye::input::InputSourceType::VideoFile)
-        && !options.input.camera_pipeline.empty()) {
+    if ((options.input.type == catcheye::input::InputSourceType::ImageFile ||
+         options.input.type == catcheye::input::InputSourceType::VideoFile) &&
+        !options.input.camera_pipeline.empty()) {
         throw std::runtime_error("--camera-pipeline is only valid with --camera");
     }
 
-    if ((options.input.type == catcheye::input::InputSourceType::ImageFile
-         || options.input.type == catcheye::input::InputSourceType::VideoFile)
-        && options.input.uri.empty()) {
+    if ((options.input.type == catcheye::input::InputSourceType::ImageFile ||
+         options.input.type == catcheye::input::InputSourceType::VideoFile) &&
+        options.input.uri.empty()) {
         throw std::runtime_error("input path is required for --image or --video");
     }
 
     return options;
 }
 
-DefaultPaths resolve_default_paths(const char* executable_path)
-{
-    return DefaultPaths {
+DefaultPaths resolve_default_paths(const char* executable_path) {
+    return DefaultPaths{
         .param_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/model.ncnn.param"),
         .bin_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/model.ncnn.bin"),
         .metadata_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/metadata.yaml"),
@@ -128,8 +126,7 @@ DefaultPaths resolve_default_paths(const char* executable_path)
     };
 }
 
-LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path)
-{
+LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path) {
     const auto roi_parse_result = catcheye::roi::RoiRepository::load_from_file(roi_config_path);
     if (!roi_parse_result.success) {
         throw std::runtime_error("failed to load ROI config: " + roi_config_path);
@@ -140,23 +137,38 @@ LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path)
         throw std::runtime_error("ROI config failed validation: " + roi_config_path);
     }
 
-    return LoadedRoiConfig {
+    return LoadedRoiConfig{
         .path = roi_config_path,
         .config = roi_parse_result.config,
     };
 }
 
-AppBootstrap build_app_bootstrap(
-    const AppOptions& options,
-    const DefaultPaths& default_paths,
-    const LoadedRoiConfig& loaded_roi_config)
-{
+AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& default_paths, const LoadedRoiConfig& loaded_roi_config) {
     AppBootstrap bootstrap;
 
-    bootstrap.processor_config.detector.param_path = default_paths.param_path;
-    bootstrap.processor_config.detector.bin_path = default_paths.bin_path;
-    bootstrap.processor_config.detector.metadata_path = default_paths.metadata_path;
-    bootstrap.processor_config.detector.num_threads = options.num_threads;
+    // ── 공통 설정 ─────────────────────────────────────────────
+    bootstrap.processor_config.detector.backend = options.detector_backend;
+
+    // ── NCNN 백엔드 설정 ──────────────────────────────────────
+    auto& ncnn_cfg = bootstrap.processor_config.detector.ncnn;
+    ncnn_cfg.param_path = default_paths.param_path;
+    ncnn_cfg.bin_path = default_paths.bin_path;
+    ncnn_cfg.metadata_path = default_paths.metadata_path;
+    ncnn_cfg.num_threads = options.num_threads;
+
+    // positional args override (기존 동작 유지)
+    if (!options.positional_args.empty()) ncnn_cfg.param_path = options.positional_args[0];
+    if (options.positional_args.size() > 1) ncnn_cfg.bin_path = options.positional_args[1];
+    if (options.positional_args.size() > 2) ncnn_cfg.metadata_path = options.positional_args[2];
+
+    // ── MediaPipe 백엔드 설정 ─────────────────────────────────
+    auto& mp_cfg = bootstrap.processor_config.detector.mediapipe;
+    mp_cfg.model_path = default_paths.mediapipe_model_path; // DefaultPaths 에 추가
+    mp_cfg.score_threshold = 0.35F;
+    mp_cfg.num_threads = options.num_threads;
+    mp_cfg.category_allowlist = {"person"};
+
+    // ── ROI / runtime 설정 (기존과 동일) ─────────────────────
     bootstrap.processor_config.roi_enabled = true;
     bootstrap.processor_config.roi_auto_reload = options.input.type == catcheye::input::InputSourceType::Camera;
     bootstrap.processor_config.roi_config_path = loaded_roi_config.path;
@@ -168,42 +180,27 @@ AppBootstrap build_app_bootstrap(
     bootstrap.publish_results = options.publish_results;
     bootstrap.publisher_config.port = options.websocket_port;
 
-    if (!options.positional_args.empty()) {
-        bootstrap.processor_config.detector.param_path = options.positional_args[0];
-    }
-    if (options.positional_args.size() > 1) {
-        bootstrap.processor_config.detector.bin_path = options.positional_args[1];
-    }
-    if (options.positional_args.size() > 2) {
-        bootstrap.processor_config.detector.metadata_path = options.positional_args[2];
-    }
-    if (options.positional_args.size() > 3) {
-        bootstrap.processor_config.roi_config_path = options.positional_args[3];
-    }
-
-    if (bootstrap.processor_config.detector.param_path.empty() || bootstrap.processor_config.detector.bin_path.empty()) {
-        throw std::runtime_error("model paths are required");
+    // NCNN 경로 유효성 검사 (MediaPipe 사용 시에는 skip)
+    if (options.detector_backend == DetectorBackend::Ncnn) {
+        if (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty()) {
+            throw std::runtime_error("NCNN model paths are required");
+        }
     }
 
     bootstrap.source = catcheye::input::create_frame_source(options.input);
     return bootstrap;
 }
 
-int run_app(int argc, char** argv)
-{
+int run_app(int argc, char** argv) {
     const AppOptions options = parse_app_options(argc, argv);
     const DefaultPaths default_paths = resolve_default_paths(argv[0]);
-    const std::string roi_config_path =
-        options.positional_args.size() > 3 ? options.positional_args[3] : default_paths.roi_config_path;
+    const std::string roi_config_path = options.positional_args.size() > 3 ? options.positional_args[3] : default_paths.roi_config_path;
     const LoadedRoiConfig loaded_roi_config = load_and_validate_roi_config(roi_config_path);
     AppBootstrap bootstrap = build_app_bootstrap(options, default_paths, loaded_roi_config);
 
     if (const auto log = logger()) {
-        log->info(
-            "catcheye-guard starting (ROI='{}', preview={}, ws={})",
-            bootstrap.processor_config.roi_config_path,
-            bootstrap.runtime_config.render_preview,
-            bootstrap.publish_results);
+        log->info("catcheye-guard starting (ROI='{}', preview={}, ws={})", bootstrap.processor_config.roi_config_path,
+                  bootstrap.runtime_config.render_preview, bootstrap.publish_results);
     }
 
     std::unique_ptr<catcheye::transport::ResultPublisher> publisher;
@@ -212,11 +209,8 @@ int run_app(int argc, char** argv)
     }
 
     auto processor = std::make_unique<catcheye::GuardProcessor>(std::move(bootstrap.processor_config));
-    catcheye::runtime::FrameProcessingRunner runner(
-        std::move(bootstrap.runtime_config),
-        std::move(bootstrap.source),
-        std::move(processor),
-        std::move(publisher));
+    catcheye::runtime::FrameProcessingRunner runner(std::move(bootstrap.runtime_config), std::move(bootstrap.source), std::move(processor),
+                                                    std::move(publisher));
     return runner.run();
 }
 

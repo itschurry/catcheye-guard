@@ -19,6 +19,7 @@ struct AppOptions {
     int websocket_port = 8080;
     int num_threads = 2;
     std::vector<std::string> positional_args;
+    DetectorBackend detector_backend = DetectorBackend::Ncnn;
 };
 
 struct DefaultPaths {
@@ -44,10 +45,7 @@ struct AppBootstrap {
 AppOptions parse_app_options(int argc, char** argv);
 DefaultPaths resolve_default_paths(const char* executable_path);
 LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path);
-AppBootstrap build_app_bootstrap(
-    const AppOptions& options,
-    const DefaultPaths& default_paths,
-    const LoadedRoiConfig& loaded_roi_config);
+AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& default_paths, const LoadedRoiConfig& loaded_roi_config);
 
 int run_app(int argc, char** argv);
 
