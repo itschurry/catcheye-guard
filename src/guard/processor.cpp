@@ -82,10 +82,10 @@ std::string build_metadata_json(const std::vector<EvaluatedDetection>& detection
 } // namespace
 
 GuardProcessor::GuardProcessor(GuardProcessorConfig config)
-    : config_(std::move(config)), detector_(create_detector(config_.detector)) // 팩토리로 백엔드 선택
+    : config_(std::move(config)), detector_(create_detector(config_.detector))
 {
     if (const auto log = logger()) {
-        log->info("GuardProcessor created with '{}' backend", backend_name(config_.detector.backend));
+        log->info("GuardProcessor created with 'ncnn' backend");
     }
 }
 

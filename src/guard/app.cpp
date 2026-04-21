@@ -95,8 +95,6 @@ AppOptions parse_app_options(int argc, char** argv) {
             throw std::runtime_error("missing value for flag: " + arg);
         } else if (is_input_mode(arg)) {
             throw std::runtime_error("input mode flags are mutually exclusive");
-        } else if (arg == "--mediapipe") {
-            options.detector_backend = DetectorBackend::MediaPipe;
         } else {
             options.positional_args.push_back(arg);
         }
@@ -146,9 +144,6 @@ LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path)
 AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& default_paths, const LoadedRoiConfig& loaded_roi_config) {
     AppBootstrap bootstrap;
 
-    // ── 공통 설정 ─────────────────────────────────────────────
-    bootstrap.processor_config.detector.backend = options.detector_backend;
-
     // ── NCNN 백엔드 설정 ──────────────────────────────────────
     auto& ncnn_cfg = bootstrap.processor_config.detector.ncnn;
     ncnn_cfg.param_path = default_paths.param_path;
@@ -160,13 +155,6 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     if (!options.positional_args.empty()) ncnn_cfg.param_path = options.positional_args[0];
     if (options.positional_args.size() > 1) ncnn_cfg.bin_path = options.positional_args[1];
     if (options.positional_args.size() > 2) ncnn_cfg.metadata_path = options.positional_args[2];
-
-    // ── MediaPipe 백엔드 설정 ─────────────────────────────────
-    auto& mp_cfg = bootstrap.processor_config.detector.mediapipe;
-    mp_cfg.model_path = default_paths.mediapipe_model_path; // DefaultPaths 에 추가
-    mp_cfg.score_threshold = 0.35F;
-    mp_cfg.num_threads = options.num_threads;
-    mp_cfg.category_allowlist = {"person"};
 
     // ── ROI / runtime 설정 (기존과 동일) ─────────────────────
     bootstrap.processor_config.roi_enabled = true;
@@ -180,11 +168,8 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     bootstrap.publish_results = options.publish_results;
     bootstrap.publisher_config.port = options.websocket_port;
 
-    // NCNN 경로 유효성 검사 (MediaPipe 사용 시에는 skip)
-    if (options.detector_backend == DetectorBackend::Ncnn) {
-        if (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty()) {
-            throw std::runtime_error("NCNN model paths are required");
-        }
+    if (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty()) {
+        throw std::runtime_error("NCNN model paths are required");
     }
 
     bootstrap.source = catcheye::input::create_frame_source(options.input);

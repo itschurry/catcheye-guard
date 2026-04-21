@@ -70,49 +70,6 @@ message(STATUS "yaml-cpp version: ${yaml-cpp_VERSION}")
 find_package(spdlog REQUIRED)
 
 # ---------------------------------------------------------------------------
-# MediaPipe (required)
-# ---------------------------------------------------------------------------
-set(MEDIAPIPE_ROOT_DEFAULT "/opt/mediapipe-aarch64")
-if(DEFINED ENV{MEDIAPIPE_ROOT} AND NOT "$ENV{MEDIAPIPE_ROOT}" STREQUAL "")
-    set(MEDIAPIPE_ROOT_DEFAULT "$ENV{MEDIAPIPE_ROOT}")
-endif()
-
-set(MEDIAPIPE_ROOT
-    "${MEDIAPIPE_ROOT_DEFAULT}"
-    CACHE PATH "MediaPipe installation root (include/ + lib/)"
-)
-
-if(NOT EXISTS "${MEDIAPIPE_ROOT}/include/mediapipe")
-    message(FATAL_ERROR
-        "MediaPipe headers not found: ${MEDIAPIPE_ROOT}/include/mediapipe\n"
-        "Install MediaPipe for the target architecture and set MEDIAPIPE_ROOT."
-    )
-endif()
-
-file(GLOB MEDIAPIPE_LIB_FILES CONFIGURE_DEPENDS
-    "${MEDIAPIPE_ROOT}/lib/*.a"
-    "${MEDIAPIPE_ROOT}/lib/*.so"
-)
-
-if(NOT MEDIAPIPE_LIB_FILES)
-    message(FATAL_ERROR
-        "MediaPipe libraries not found under ${MEDIAPIPE_ROOT}/lib\n"
-        "Install MediaPipe for the target architecture and set MEDIAPIPE_ROOT."
-    )
-endif()
-
-add_library(mediapipe_tasks INTERFACE)
-target_include_directories(mediapipe_tasks INTERFACE
-    "${MEDIAPIPE_ROOT}/include"
-)
-target_link_libraries(mediapipe_tasks INTERFACE
-    ${MEDIAPIPE_LIB_FILES}
-)
-
-message(STATUS "MediaPipe root: ${MEDIAPIPE_ROOT}")
-message(STATUS "MediaPipe libs: ${MEDIAPIPE_LIB_FILES}")
-
-# ---------------------------------------------------------------------------
 # Source collection
 # ---------------------------------------------------------------------------
 file(GLOB_RECURSE CATCHEYE_GUARD_SOURCES CONFIGURE_DEPENDS
@@ -145,7 +102,6 @@ target_compile_features(catcheye_guard PUBLIC cxx_std_20)
 target_compile_definitions(catcheye_guard
     PUBLIC
         $<$<CONFIG:Debug>:CATCHEYE_DEBUG>
-        CATCHEYE_MEDIAPIPE_ENABLED
 )
 
 target_link_libraries(catcheye_guard
@@ -157,7 +113,6 @@ target_link_libraries(catcheye_guard
         catcheye::vision_transport
         ncnn
         spdlog::spdlog
-        mediapipe_tasks
     PRIVATE
         yaml-cpp
 )

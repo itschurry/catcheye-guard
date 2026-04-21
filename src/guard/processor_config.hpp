@@ -3,13 +3,12 @@
 #include <string>
 
 #include "catcheye/roi/camera_roi_config.hpp"
-#include "guard/detector_factory.hpp" // DetectorBackend + DetectorFactoryConfig
+#include "guard/detector_factory.hpp"
 
 namespace catcheye {
 
 struct GuardProcessorConfig {
-    // ── 검출 백엔드 설정 ─────────────────────────────────────
-    DetectorFactoryConfig detector; // backend 선택 + 각 백엔드별 파라미터 포함
+    DetectorFactoryConfig detector;
 
     // ── 클래스 필터 ──────────────────────────────────────────
     bool filter_by_class = true;

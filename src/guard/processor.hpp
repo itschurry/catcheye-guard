@@ -22,7 +22,7 @@ class GuardProcessor final : public catcheye::runtime::FrameProcessor {
 
   private:
     GuardProcessorConfig config_;
-    std::unique_ptr<IDetector> detector_; // NCNN / MediaPipe 모두 수용
+    std::unique_ptr<IDetector> detector_;
     std::vector<Detection> cached_detections_;
     std::string last_seen_roi_config_text_;
     bool roi_reload_watch_warning_emitted_ = false;

@@ -19,7 +19,6 @@ struct AppOptions {
     int websocket_port = 8080;
     int num_threads = 2;
     std::vector<std::string> positional_args;
-    DetectorBackend detector_backend = DetectorBackend::Ncnn;
 };
 
 struct DefaultPaths {
