@@ -1,13 +1,5 @@
 services:
-  # [공통 설정] 모든 모드에서 상속받아 사용할 베이스 서비스
   robot-base:
-    # CPU 성능 제한: 3코어만 사용(스케줄링/쿼터 + 코어 바인딩)
-    # - cpus: 총 CPU 시간(쿼터) 제한
-    # - cpuset: 사용할 논리 코어 고정(예: 0-2 = 3코어)
-    # cpus: "3.0"
-    # cpuset: "0-2"
-    env_file:
-      - ../.env
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -16,31 +8,3 @@ services:
         GID: ${GID:-1000}
         USERNAME: ${USER:-appuser}
         HOME: ${HOME:-/home/${USER:-appuser}}
-        TAG: ${TAG:-develop}
-        # LD_LIBRARY_PATH: ${LD_LIBRARY_PATH:-}
-
-    # 1. 네트워크 & IPC
-    network_mode: host
-    ipc: host
-
-    # 3. 환경 변수 (공통)
-    environment:
-      - DISPLAY=:0
-      - QT_X11_NO_MITSHM=1
-      - XAUTHORITY=/tmp/.Xauthority
-      - TZ=Asia/Seoul
-      # - LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/zed/lib:/usr/local/lib:${LD_LIBRARY_PATH:-}
-      # - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      # - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      # - ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
-      # - IS_MASTER=${IS_MASTER:-0}
-      # - ROS_STATIC_PEERS=192.168.10.21;192.168.10.22;192.168.10.23;192.168.10.24
-      # - ROS_STATIC_PEERS=192.168.10.11;192.168.10.12;192.168.10.13;192.168.10.14;192.168.10.15;192.168.10.16;192.168.10.17
-
-    # 4. 볼륨 마운트 (공통)
-    volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ${XAUTHORITY:-$HOME/.Xauthority}:/tmp/.Xauthority:ro
-      - /etc/udev/rules.d:/etc/udev/rules.d:ro
-      - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro

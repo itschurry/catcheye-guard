@@ -1,17 +1,15 @@
-# FROM ghcr.io/itschurry/ros:jazzy
 FROM ubuntu:24.04
 LABEL authors="itschurry"
 LABEL maintainer="itschurry"
 ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Seoul
 ENV TARGET_SYSROOT=/opt/sysroots/raspi
 
-RUN id -u && id -g
 ARG UID=1000
 ARG GID=1000
 ARG USERNAME=appuser
 ARG HOME=/home/${USERNAME}
-# ----------------------------------------------------------------------------------------------
-# [시스템 패키지]
+
 RUN set -eux; \
     dpkg --add-architecture arm64; \
     printf '%s\n' \
@@ -47,7 +45,7 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
     # [기본 유틸리티] 패키지 다운로드 / 인증
-    ca-certificates curl git sudo unzip wget zip \
+    tzdata ca-certificates curl git sudo unzip wget zip python3 \
     # [빌드 도구] 호스트용
     build-essential cmake file ninja-build pkg-config \
     # [크로스 컴파일러 / sysroot]
@@ -71,8 +69,8 @@ RUN set -eux; \
     libtiff5-dev:arm64; \
     cp /var/cache/apt/archives/*.deb /tmp/sysroot-debs/; \
     for pkg in /tmp/sysroot-debs/*_arm64.deb /tmp/sysroot-debs/*_all.deb; do \
-        [ -e "${pkg}" ] || continue; \
-        dpkg-deb -x "${pkg}" "${TARGET_SYSROOT}"; \
+    [ -e "${pkg}" ] || continue; \
+    dpkg-deb -x "${pkg}" "${TARGET_SYSROOT}"; \
     done; \
     \
     apt-get clean; \
@@ -91,17 +89,8 @@ RUN useradd -m -u $UID -g $GID -d $HOME -s /bin/bash $USERNAME && \
     chmod 0440 /etc/sudoers.d/$USERNAME && \
     usermod -aG sudo,video,dialout,plugdev $USERNAME
 
-# COPY --chown=$USERNAME:$USERNAME ros_settings.sh /ros_settings.sh
-# # User가 소유자이므로 sudo 불필요
-# RUN chmod +x /ros_settings.sh
-
-# COPY --chown=$USERNAME:$USERNAME entrypoint.sh /entrypoint.sh
-# RUN chmod +x /entrypoint.sh
-
 USER $USERNAME
 WORKDIR $HOME
-
-# ----------------------------------------------------------------------------------------------
 # 설치 sysroot 준비
 RUN sudo mkdir -p ${TARGET_SYSROOT}
 
@@ -137,9 +126,4 @@ RUN git clone --depth 1 https://github.com/Tencent/ncnn.git && \
     sudo cmake --install ncnn/build-aarch64 && \
     sudo ldconfig
 
-# .bashrc 설정
-# RUN echo 'source ~/ros_ws/ros_settings.sh' >> ~/.bashrc
-
-# 컨테이너 시작
-# ENTRYPOINT ["/entrypoint.sh"]
 CMD ["bash"]
