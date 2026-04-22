@@ -23,17 +23,38 @@ endif()
 set(CMAKE_C_COMPILER "${AARCH64_GCC}")
 set(CMAKE_CXX_COMPILER "${AARCH64_GXX}")
 
-set(CMAKE_FIND_ROOT_PATH /usr/aarch64-linux-gnu)
+if(DEFINED ENV{TARGET_SYSROOT} AND NOT "$ENV{TARGET_SYSROOT}" STREQUAL "")
+    set(TARGET_SYSROOT "$ENV{TARGET_SYSROOT}" CACHE PATH "Target sysroot" FORCE)
+else()
+    set(TARGET_SYSROOT "/opt/sysroots/raspi" CACHE PATH "Target sysroot" FORCE)
+endif()
 
-# Debian/Ubuntu multiarch packages place CMake configs under /usr/lib/aarch64-linux-gnu/cmake.
-# Pin package config directories explicitly for cross-compile dependency resolution.
-set(OpenCV_DIR    "/usr/lib/aarch64-linux-gnu/cmake/opencv4"  CACHE PATH "OpenCV CMake package directory"   FORCE)
-set(ncnn_DIR      "/opt/ncnn-aarch64/lib/cmake/ncnn"          CACHE PATH "ncnn CMake package directory"     FORCE)
-set(yaml-cpp_DIR  "/usr/lib/aarch64-linux-gnu/cmake/yaml-cpp" CACHE PATH "yaml-cpp CMake package directory" FORCE)
-set(spdlog_DIR    "/usr/lib/aarch64-linux-gnu/cmake/spdlog"   CACHE PATH "spdlog CMake package directory"   FORCE)
-set(fmt_DIR       "/usr/lib/aarch64-linux-gnu/cmake/fmt"      CACHE PATH "fmt CMake package directory"      FORCE)
+set(CMAKE_FIND_ROOT_PATH
+    "${TARGET_SYSROOT}"
+    "/usr/aarch64-linux-gnu"
+)
+set(CMAKE_PREFIX_PATH
+    "${TARGET_SYSROOT}/usr"
+    CACHE STRING "Cross-compile package prefixes" FORCE
+)
+
+# Package configs are resolved from the extracted target sysroot.
+set(OpenCV_DIR    "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/opencv4"  CACHE PATH "OpenCV CMake package directory"   FORCE)
+set(ncnn_DIR      "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/ncnn"     CACHE PATH "ncnn CMake package directory"     FORCE)
+set(yaml-cpp_DIR  "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/yaml-cpp" CACHE PATH "yaml-cpp CMake package directory" FORCE)
+set(spdlog_DIR    "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/spdlog"   CACHE PATH "spdlog CMake package directory"   FORCE)
+set(fmt_DIR       "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/fmt"      CACHE PATH "fmt CMake package directory"      FORCE)
 
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+
+# vision sdk uses pkg-config for libcamera/GStreamer, so point it at the target
+# sysroot metadata extracted in the Docker image.
+set(ENV{PKG_CONFIG_DIR} "")
+set(ENV{PKG_CONFIG_PATH} "")
+set(ENV{PKG_CONFIG_SYSROOT_DIR} "${TARGET_SYSROOT}")
+set(ENV{PKG_CONFIG_LIBDIR}
+    "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/pkgconfig:${TARGET_SYSROOT}/usr/share/pkgconfig"
+)

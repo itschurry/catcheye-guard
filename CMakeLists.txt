@@ -63,6 +63,7 @@ message(STATUS "OpenCV version: ${OpenCV_VERSION}")
 
 find_package(ncnn REQUIRED)
 message(STATUS "ncnn version: ${ncnn_VERSION}")
+message(STATUS "target sysroot: ${TARGET_SYSROOT}")
 
 find_package(yaml-cpp REQUIRED)
 message(STATUS "yaml-cpp version: ${yaml-cpp_VERSION}")
@@ -259,6 +260,37 @@ install(
     PATTERN "__pycache__" EXCLUDE
     PATTERN "*.pyc" EXCLUDE
 )
+
+if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}/usr/lib")
+    install(
+        DIRECTORY "${TARGET_SYSROOT}/usr/lib/"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        FILES_MATCHING
+        PATTERN "libncnn*.so"
+        PATTERN "libncnn*.so.*"
+        PATTERN "libncnn*.a"
+    )
+else()
+    message(WARNING "TARGET_SYSROOT/usr/lib not found; ncnn libraries will not be copied into the install tree")
+endif()
+
+if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu")
+    install(
+        DIRECTORY "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        FILES_MATCHING
+        PATTERN "libopencv*.so"
+        PATTERN "libopencv*.so.*"
+        PATTERN "libyaml-cpp*.so"
+        PATTERN "libyaml-cpp*.so.*"
+        PATTERN "libspdlog*.so"
+        PATTERN "libspdlog*.so.*"
+        PATTERN "libfmt*.so"
+        PATTERN "libfmt*.so.*"
+    )
+else()
+    message(WARNING "TARGET_SYSROOT runtime libraries not found; bundled third-party runtime libs will be incomplete")
+endif()
 
 install(EXPORT catcheye_guard_targets
     FILE catcheye_guard_targets.cmake

@@ -3,7 +3,7 @@ FROM ubuntu:24.04
 LABEL authors="itschurry"
 LABEL maintainer="itschurry"
 ARG DEBIAN_FRONTEND=noninteractive
-ENV NCNN_ROOT=/opt/ncnn-aarch64
+ENV TARGET_SYSROOT=/opt/sysroots/raspi
 
 RUN id -u && id -g
 ARG UID=1000
@@ -53,12 +53,30 @@ RUN set -eux; \
     # [크로스 컴파일러 / sysroot]
     gcc-13-aarch64-linux-gnu g++-13-aarch64-linux-gnu \
     libc6-dev-arm64-cross libstdc++-13-dev-arm64-cross \
-    # [ARM64 대상 개발 패키지] 앱 링크용
-    libfmt-dev:arm64 libopencv-dev:arm64 libyaml-cpp-dev:arm64 libspdlog-dev:arm64 \
-    libjpeg-dev:arm64 libpng-dev:arm64 libtiff5-dev:arm64; \
+    dpkg-dev; \
+    \
+    mkdir -p /tmp/sysroot-debs "${TARGET_SYSROOT}"; \
+    apt-get install -y --download-only --no-install-recommends \
+    # [ARM64 대상 개발 패키지] 설치하지 않고 sysroot로 추출
+    libcamera-dev:arm64 \
+    libgstreamer1.0-dev:arm64 \
+    libgstreamer-plugins-base1.0-dev:arm64 \
+    libgstrtspserver-1.0-dev:arm64 \
+    libfmt-dev:arm64 \
+    libopencv-dev:arm64 \
+    libyaml-cpp-dev:arm64 \
+    libspdlog-dev:arm64 \
+    libjpeg-dev:arm64 \
+    libpng-dev:arm64 \
+    libtiff5-dev:arm64; \
+    cp /var/cache/apt/archives/*.deb /tmp/sysroot-debs/; \
+    for pkg in /tmp/sysroot-debs/*_arm64.deb /tmp/sysroot-debs/*_all.deb; do \
+        [ -e "${pkg}" ] || continue; \
+        dpkg-deb -x "${pkg}" "${TARGET_SYSROOT}"; \
+    done; \
     \
     apt-get clean; \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/sysroot-debs
 
 RUN userdel -r ubuntu || true && groupdel ubuntu || true
 
@@ -84,14 +102,40 @@ USER $USERNAME
 WORKDIR $HOME
 
 # ----------------------------------------------------------------------------------------------
-# 설치 prefix 준비
-RUN sudo mkdir -p ${NCNN_ROOT}
+# 설치 sysroot 준비
+RUN sudo mkdir -p ${TARGET_SYSROOT}
 
 RUN printf '%s\n' \
-    "export NCNN_ROOT=${NCNN_ROOT}" \
+    "export TARGET_SYSROOT=${TARGET_SYSROOT}" \
     'export PATH=/usr/local/bin:$PATH' \
     >> ~/.bashrc
 
+# 이 이미지는 "재현 가능한 크로스빌드 + sysroot + ncnn 준비"에 집중한다.
+# ARM64 dev 패키지는 설치하지 않고 sysroot로 추출해서 사용한다.
+
+# ncnn 빌드 / 설치
+WORKDIR $HOME
+RUN git clone --depth 1 https://github.com/Tencent/ncnn.git && \
+    cmake -S ncnn -B ncnn/build-aarch64 -G Ninja \
+    -DCMAKE_SYSTEM_NAME=Linux \
+    -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+    -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc-13 \
+    -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++-13 \
+    -DCMAKE_FIND_ROOT_PATH=/usr/aarch64-linux-gnu \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+    -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=${TARGET_SYSROOT}/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib/aarch64-linux-gnu \
+    -DNCNN_VULKAN=OFF \
+    -DNCNN_BUILD_TOOLS=OFF \
+    -DNCNN_BUILD_EXAMPLES=OFF \
+    && \
+    cmake --build ncnn/build-aarch64 -j$(nproc) && \
+    sudo cmake --install ncnn/build-aarch64 && \
+    sudo ldconfig
 
 # .bashrc 설정
 # RUN echo 'source ~/ros_ws/ros_settings.sh' >> ~/.bashrc

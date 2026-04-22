@@ -46,9 +46,10 @@ EvaluationResult decision = evaluate_bbox_fully_inside(100, 50, 80, 150, parsed.
 
 ## ARM64 크로스 컴파일 가이드
 요약:
-- ARM 장비에는 런타임 의존 라이브러리를 먼저 설치한다.
-- 개발 PC에서는 `docker compose`로 크로스빌드 환경을 만든다.
-- 최종 배포는 `install/aarch64`와 `/opt/ncnn-aarch64`를 ARM 장비에 복사한다.
+- Docker 이미지는 ARM64 sysroot 안에 앱 의존성을 미리 준비한다.
+- 개발 PC에서는 그 sysroot를 사용해 크로스컴파일한다.
+- `cmake --install` 결과물에는 앱과 함께 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt` 런타임 라이브러리를 포함한다.
+- Raspberry Pi에는 카메라/미디어 런타임만 최소 설치하고 `install/aarch64`만 복사한다.
 
 사용 중인 툴체인 파일:
 - [`toolchains/aarch64-linux-gnu.cmake`](/home/user/catcheye-guard/toolchains/aarch64-linux-gnu.cmake)
@@ -56,33 +57,25 @@ EvaluationResult decision = evaluate_bbox_fully_inside(100, 50, 80, 150, parsed.
 ### ARM 장비에서 할 일
 
 장비에는 아래가 먼저 있어야 한다.
-- `OpenCV`
 - `GStreamer`
 - `libcamera`
-- `yaml-cpp`
-- `spdlog`
-- `fmt`
+- `gstreamer-rtsp-server`
+- 카메라 / 인코더 관련 GStreamer 플러그인
 
 Ubuntu 24.04 계열 예시:
 
 ```bash
 sudo apt update
 sudo apt install -y \
-  libopencv-dev \
-  libyaml-cpp-dev \
-  libspdlog-dev \
-  libfmt-dev \
   gstreamer1.0-libav \
   gstreamer1.0-libcamera \
   gstreamer1.0-plugins-bad \
   gstreamer1.0-plugins-base \
   gstreamer1.0-plugins-good \
+  libgstrtspserver-1.0-0 \
   gstreamer1.0-tools \
   libcamera-dev
 ```
-
-추가 전제:
-- `ncnn`은 `/opt/ncnn-aarch64`
 
 실행 확인:
 
@@ -99,28 +92,15 @@ docker compose -f docker/docker-compose.dev.yml build
 docker compose -f docker/docker-compose.dev.yml run --rm catcheye-guard-dev bash
 ```
 
-컨테이너 안에서 `ncnn`을 먼저 준비한다.
-
-`ncnn`:
-
-```bash
-git clone --depth 1 https://github.com/Tencent/ncnn.git
-cmake -S ncnn -B ncnn/build-aarch64 -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_INSTALL_PREFIX=/opt/ncnn-aarch64 \
-  -DNCNN_VULKAN=OFF \
-  -DNCNN_BUILD_TOOLS=OFF \
-  -DNCNN_BUILD_EXAMPLES=OFF
-
-cmake --build ncnn/build-aarch64 -j$(nproc)
-sudo cmake --install ncnn/build-aarch64
-```
+이미지 빌드 과정에서 아래가 자동 준비된다.
+- target sysroot: `/opt/sysroots/raspi`
+- `ncnn`: `/opt/sysroots/raspi/usr`
 
 설치 결과 확인:
 
 ```bash
-ls /opt/ncnn-aarch64
-ls /opt/ncnn-aarch64/lib/cmake/ncnn
+ls /opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/pkgconfig
+ls /opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/cmake/ncnn
 ```
 
 컨테이너 안에서 앱을 크로스컴파일한다.
@@ -129,12 +109,13 @@ ls /opt/ncnn-aarch64/lib/cmake/ncnn
 cmake -S /home/user/catcheye-guard -B /home/user/catcheye-guard/build/aarch64 -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE=/home/user/catcheye-guard/toolchains/aarch64-linux-gnu.cmake \
-  -DOpenCV_DIR=/usr/lib/aarch64-linux-gnu/cmake/opencv4 \
-  -Dncnn_DIR=/opt/ncnn-aarch64/lib/cmake/ncnn
+  -DTARGET_SYSROOT=/opt/sysroots/raspi
 
 cmake --build /home/user/catcheye-guard/build/aarch64 -j$(nproc)
 cmake --install /home/user/catcheye-guard/build/aarch64 --prefix /home/user/catcheye-guard/install/aarch64
 ```
+
+`cmake --install` 단계에서 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt` 런타임 라이브러리도 `install/aarch64/lib` 아래로 함께 복사된다.
 
 ### 배포
 
@@ -142,14 +123,13 @@ cmake --install /home/user/catcheye-guard/build/aarch64 --prefix /home/user/catc
 
 ```bash
 rsync -av install/aarch64/ user@arm-device:/opt/catcheye-guard/
-rsync -av /opt/ncnn-aarch64/ user@arm-device:/opt/ncnn-aarch64/
 ```
 
 ARM 장비에서 복사 결과 확인:
 
 ```bash
 ls /opt/catcheye-guard
-ls /opt/ncnn-aarch64/lib/cmake/ncnn
+ls /opt/catcheye-guard/lib | grep ncnn
 ```
 
 ### 실행
@@ -164,10 +144,15 @@ cd /opt/catcheye-guard
 ### 문제 생기면 확인
 
 `Could not find OpenCVConfig.cmake`
-- `-DOpenCV_DIR=/usr/lib/aarch64-linux-gnu/cmake/opencv4`
+- `-DTARGET_SYSROOT=/opt/sysroots/raspi`
+- `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/cmake/opencv4`
 
 `Could not find ncnn`
-- `/opt/ncnn-aarch64/lib/cmake/ncnn/ncnnConfig.cmake`
+- `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/cmake/ncnn/ncnnConfig.cmake`
+
+`pkg-config`로 `libcamera` / `gstreamer`를 못 찾음
+- `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/pkgconfig`
+- `toolchains/aarch64-linux-gnu.cmake`의 `PKG_CONFIG_LIBDIR`
 
 `libcamerasrc` 오류
 - `gst-inspect-1.0 libcamerasrc`
