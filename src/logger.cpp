@@ -67,7 +67,6 @@ bool initialize_logging(const std::string& logger_name, const std::string& log_d
         created_logger->flush_on(spdlog::level::info);
 
         spdlog::set_default_logger(created_logger);
-        spdlog::register_logger(created_logger);
         global_logger() = std::move(created_logger);
         global_logger()->info("logging initialized at {}", log_directory);
         return true;

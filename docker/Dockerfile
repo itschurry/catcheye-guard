@@ -4,11 +4,14 @@ LABEL maintainer="itschurry"
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Seoul
 ENV TARGET_SYSROOT=/opt/sysroots/raspi
+ARG LIBCAMERA_REF=main
 
 ARG UID=1000
 ARG GID=1000
 ARG USERNAME=appuser
 ARG HOME=/home/${USERNAME}
+
+COPY docker/libcamera-aarch64.ini /tmp/libcamera-aarch64.ini
 
 RUN set -eux; \
     dpkg --add-architecture arm64; \
@@ -47,7 +50,9 @@ RUN set -eux; \
     # [기본 유틸리티] 패키지 다운로드 / 인증
     tzdata ca-certificates curl git sudo unzip wget zip python3 \
     # [빌드 도구] 호스트용
-    build-essential cmake file ninja-build pkg-config \
+    build-essential cmake file ninja-build pkg-config meson \
+    python3-jinja2 python3-ply python3-yaml python3-pyelftools python3-pip \
+    flex bison \
     # [크로스 컴파일러 / sysroot]
     gcc-13-aarch64-linux-gnu g++-13-aarch64-linux-gnu \
     libc6-dev-arm64-cross libstdc++-13-dev-arm64-cross \
@@ -56,10 +61,15 @@ RUN set -eux; \
     mkdir -p /tmp/sysroot-debs "${TARGET_SYSROOT}"; \
     apt-get install -y --download-only --no-install-recommends \
     # [ARM64 대상 개발 패키지] 설치하지 않고 sysroot로 추출
-    libcamera-dev:arm64 \
     libgstreamer1.0-dev:arm64 \
     libgstreamer-plugins-base1.0-dev:arm64 \
     libgstrtspserver-1.0-dev:arm64 \
+    libdrm-dev:arm64 \
+    libevent-dev:arm64 \
+    libexif-dev:arm64 \
+    libgnutls28-dev:arm64 \
+    libdw-dev:arm64 \
+    libyaml-dev:arm64 \
     libfmt-dev:arm64 \
     libopencv-dev:arm64 \
     libyaml-cpp-dev:arm64 \
@@ -118,8 +128,31 @@ RUN printf '%s\n' \
     'export PATH=/usr/local/bin:$PATH' \
     >> ~/.bashrc
 
-# 이 이미지는 "재현 가능한 크로스빌드 + sysroot + ncnn 준비"에 집중한다.
-# ARM64 dev 패키지는 설치하지 않고 sysroot로 추출해서 사용한다.
+# 이 이미지는 "재현 가능한 크로스빌드 + sysroot + ncnn/libcamera 준비"에 집중한다.
+# ARM64 dev 패키지는 sysroot로 추출하고, libcamera는 별도 소스 크로스빌드한다.
+
+# libcamera 빌드 / 설치
+WORKDIR $HOME
+RUN git clone --branch ${LIBCAMERA_REF} --depth 1 https://github.com/raspberrypi/libcamera.git && \
+    meson setup libcamera/build-aarch64 libcamera \
+    --cross-file /tmp/libcamera-aarch64.ini \
+    --buildtype=release \
+    --prefix /usr \
+    --libdir lib/aarch64-linux-gnu \
+    -Dpipelines=rpi/vc4,rpi/pisp \
+    -Dipas=rpi/vc4,rpi/pisp \
+    -Dv4l2=enabled \
+    -Dgstreamer=enabled \
+    -Dtest=false \
+    -Dlc-compliance=disabled \
+    -Dcam=disabled \
+    -Dqcam=disabled \
+    -Ddocumentation=disabled \
+    -Dpycamera=disabled && \
+    ninja -C libcamera/build-aarch64 -j$(nproc) && \
+    sudo rm -f ${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/libcamera.so* && \
+    sudo rm -f ${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/libcamera-base.so* && \
+    sudo DESTDIR=${TARGET_SYSROOT} meson install -C libcamera/build-aarch64
 
 # ncnn 빌드 / 설치
 WORKDIR $HOME
@@ -129,7 +162,8 @@ RUN git clone --depth 1 https://github.com/Tencent/ncnn.git && \
     -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
     -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc-13 \
     -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++-13 \
-    -DCMAKE_FIND_ROOT_PATH=/usr/aarch64-linux-gnu \
+    -DCMAKE_SYSROOT=${TARGET_SYSROOT} \
+    -DCMAKE_FIND_ROOT_PATH=${TARGET_SYSROOT} \
     -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
     -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
     -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \

@@ -33,14 +33,13 @@ set(CMAKE_SYSROOT_LINK "${TARGET_SYSROOT}")
 
 set(CMAKE_FIND_ROOT_PATH
     "${TARGET_SYSROOT}"
-    "/usr/aarch64-linux-gnu"
 )
 set(CMAKE_PREFIX_PATH
     "${TARGET_SYSROOT}/usr"
     CACHE STRING "Cross-compile package prefixes" FORCE
 )
 
-# Package configs are resolved from the extracted target sysroot.
+# Package configs are resolved from the target sysroot.
 set(OpenCV_DIR    "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/opencv4"  CACHE PATH "OpenCV CMake package directory"   FORCE)
 set(ncnn_DIR      "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/ncnn"     CACHE PATH "ncnn CMake package directory"     FORCE)
 set(yaml-cpp_DIR  "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/yaml-cpp" CACHE PATH "yaml-cpp CMake package directory" FORCE)
@@ -53,7 +52,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
 # vision sdk uses pkg-config for libcamera/GStreamer, so point it at the target
-# sysroot metadata extracted in the Docker image.
+# sysroot metadata prepared in the Docker image.
 set(ENV{PKG_CONFIG_DIR} "")
 set(ENV{PKG_CONFIG_PATH} "")
 set(ENV{PKG_CONFIG_SYSROOT_DIR} "${TARGET_SYSROOT}")

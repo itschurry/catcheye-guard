@@ -47,8 +47,9 @@ EvaluationResult decision = evaluate_bbox_fully_inside(100, 50, 80, 150, parsed.
 ## ARM64 크로스 컴파일 가이드
 요약:
 - Docker 이미지는 ARM64 sysroot 안에 앱 의존성을 미리 준비한다.
+- `libcamera`는 Ubuntu 패키지를 쓰지 않고 Raspberry Pi용 소스를 직접 크로스빌드해서 sysroot에 넣는다.
 - 개발 PC에서는 그 sysroot를 사용해 크로스컴파일한다.
-- `cmake --install` 결과물에는 앱과 함께 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt` 런타임 라이브러리를 포함한다.
+- `cmake --install` 결과물에는 앱과 함께 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt`, `libcamera` 런타임과 IPA/tuning 데이터를 포함한다.
 - Raspberry Pi에는 카메라/미디어 런타임만 최소 설치하고 `install/aarch64`만 복사한다.
 
 사용 중인 툴체인 파일:
@@ -58,7 +59,6 @@ EvaluationResult decision = evaluate_bbox_fully_inside(100, 50, 80, 150, parsed.
 
 장비에는 아래가 먼저 있어야 한다.
 - `GStreamer`
-- `libcamera`
 - `gstreamer-rtsp-server`
 - 카메라 / 인코더 관련 GStreamer 플러그인
 
@@ -73,8 +73,7 @@ sudo apt install -y \
   gstreamer1.0-plugins-base \
   gstreamer1.0-plugins-good \
   libgstrtspserver-1.0-0 \
-  gstreamer1.0-tools \
-  libcamera-dev
+  gstreamer1.0-tools
 ```
 
 실행 확인:
@@ -82,6 +81,12 @@ sudo apt install -y \
 ```bash
 gst-inspect-1.0 libcamerasrc
 ```
+
+이 프로젝트는 Docker 이미지 빌드 시 `raspberrypi/libcamera`를 소스 크로스빌드해서
+`${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu` 아래에 설치한다.
+`cmake --install` 단계에서 `libcamera` 라이브러리, IPA 모듈, tuning/config 데이터를
+함께 번들하고, 설치된 `bin/catcheye-guard` 래퍼가 그 번들을 우선 사용하게 만든다.
+그래서 Raspberry Pi에 별도로 같은 `libcamera`를 소스 빌드할 필요는 없다.
 
 ### 개발 PC에서 할 일
 
@@ -95,12 +100,16 @@ docker compose -f docker/docker-compose.dev.yml run --rm catcheye-guard-dev bash
 이미지 빌드 과정에서 아래가 자동 준비된다.
 - target sysroot: `/opt/sysroots/raspi`
 - `ncnn`: `/opt/sysroots/raspi/usr`
+- `libcamera`: `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu`
 
 설치 결과 확인:
 
 ```bash
 ls /opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/pkgconfig
 ls /opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/cmake/ncnn
+ls /opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/libcamera.so*
+ls /opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/libcamera
+ls /opt/sysroots/raspi/usr/share/libcamera
 ```
 
 컨테이너 안에서 앱을 크로스컴파일한다.
@@ -115,7 +124,8 @@ cmake --build /home/user/catcheye-guard/build/aarch64 -j$(nproc)
 cmake --install /home/user/catcheye-guard/build/aarch64 --prefix /home/user/catcheye-guard/install/aarch64
 ```
 
-`cmake --install` 단계에서 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt` 런타임 라이브러리도 `install/aarch64/lib` 아래로 함께 복사된다.
+`cmake --install` 단계에서 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt`, `libcamera` 런타임과
+`libcamera` IPA/tuning 데이터가 `install/aarch64` 아래로 함께 복사된다.
 
 ### 배포
 
@@ -130,6 +140,9 @@ ARM 장비에서 복사 결과 확인:
 ```bash
 ls /opt/catcheye-guard
 ls /opt/catcheye-guard/lib | grep ncnn
+ls /opt/catcheye-guard/lib | grep libcamera
+ls /opt/catcheye-guard/lib/aarch64-linux-gnu/libcamera
+ls /opt/catcheye-guard/share/libcamera
 ```
 
 ### 실행
@@ -140,6 +153,15 @@ ARM 장비에서:
 cd /opt/catcheye-guard
 ./bin/catcheye-guard --camera
 ```
+
+설치된 `bin/catcheye-guard` 는 래퍼 스크립트다.
+실제 바이너리는 `bin/catcheye-guard-bin` 이고, 래퍼가 아래 환경변수를 설정해서
+번들된 `libcamera` 런타임을 우선 사용한다.
+
+- `LD_LIBRARY_PATH`
+- `LIBCAMERA_IPA_MODULE_PATH`
+- `LIBCAMERA_IPA_PROXY_PATH`
+- `LIBCAMERA_IPA_CONFIG_PATH`
 
 ### 실행 옵션
 
