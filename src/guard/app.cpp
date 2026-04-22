@@ -44,6 +44,35 @@ bool is_input_mode(const std::string& arg) {
     return arg == "--image" || arg == "--video" || arg == "--camera";
 }
 
+std::string describe_runtime_mode(const AppOptions& options)
+{
+    const bool rtsp_enabled = options.publish_results;
+
+    if (options.input.type == catcheye::input::InputSourceType::Camera) {
+        if (!options.input.camera_pipeline.empty()) {
+            return rtsp_enabled
+                ? "csi camera + gstreamer source + rtsp output"
+                : "csi camera + gstreamer source + local output";
+        }
+        if (!options.input.camera_device.empty()) {
+            return rtsp_enabled
+                ? "usb camera + gstreamer source + rtsp output"
+                : "usb camera + gstreamer source + local output";
+        }
+        return rtsp_enabled
+            ? "csi camera + libcamera source + rtsp output"
+            : "csi camera + libcamera source + local output";
+    }
+
+    const char* input_name =
+        options.input.type == catcheye::input::InputSourceType::ImageFile
+        ? "image file"
+        : "video file";
+    return std::string(input_name)
+        + " + gstreamer source + "
+        + (rtsp_enabled ? "rtsp output" : "local output");
+}
+
 } // namespace
 
 AppOptions parse_app_options(int argc, char** argv) {
@@ -76,6 +105,8 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.input.type = catcheye::input::InputSourceType::Camera;
         } else if (arg == "--camera-pipeline" && i + 1 < args.size()) {
             options.input.camera_pipeline = args[++i];
+        } else if (arg == "--camera-device" && i + 1 < args.size()) {
+            options.input.camera_device = args[++i];
         } else if (arg == "--camera-width" && i + 1 < args.size()) {
             options.input.camera_width = std::stoi(args[++i]);
         } else if (arg == "--camera-height" && i + 1 < args.size()) {
@@ -94,6 +125,7 @@ AppOptions parse_app_options(int argc, char** argv) {
             ++i;
             options.num_threads = std::stoi(args[i]);
         } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" ||
+                   arg == "--camera-device" ||
                    arg == "--camera-width" || arg == "--camera-height" || arg == "--num-threads") {
             throw std::runtime_error("missing value for flag: " + arg);
         } else if (is_input_mode(arg)) {
@@ -105,13 +137,17 @@ AppOptions parse_app_options(int argc, char** argv) {
 
     if ((options.input.type == catcheye::input::InputSourceType::ImageFile ||
          options.input.type == catcheye::input::InputSourceType::VideoFile) &&
-        !options.input.camera_pipeline.empty()) {
-        throw std::runtime_error("--camera-pipeline is only valid with --camera");
+        (!options.input.camera_pipeline.empty() || !options.input.camera_device.empty())) {
+        throw std::runtime_error("--camera-pipeline and --camera-device are only valid with --camera");
     }
 
     if (!options.input.camera_pipeline.empty() &&
         (options.input.camera_width != 1280 || options.input.camera_height != 720)) {
         throw std::runtime_error("--camera-width and --camera-height are not supported with --camera-pipeline");
+    }
+
+    if (!options.input.camera_pipeline.empty() && !options.input.camera_device.empty()) {
+        throw std::runtime_error("--camera-pipeline and --camera-device cannot be used together");
     }
 
     if ((options.input.type == catcheye::input::InputSourceType::ImageFile ||
@@ -206,7 +242,9 @@ int run_app(int argc, char** argv) {
     AppBootstrap bootstrap = build_app_bootstrap(options, default_paths, loaded_roi_config);
 
     if (const auto log = logger()) {
-        log->info("catcheye-guard starting (ROI='{}', rtsp={})", bootstrap.processor_config.roi_config_path,
+        log->info("catcheye-guard starting (mode='{}', ROI='{}', rtsp={})",
+                  describe_runtime_mode(options),
+                  bootstrap.processor_config.roi_config_path,
                   bootstrap.publish_results);
     }
 

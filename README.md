@@ -210,19 +210,116 @@ cd /opt/catcheye-guard
 
 - 입력 모드 `--camera`, `--image`, `--video` 는 서로 동시에 쓸 수 없다.
 - `--camera-pipeline` 은 `--camera` 와 같이 써야 한다.
-- `--camera-width`, `--camera-height` 는 `--camera` 직접 입력에서만 쓸 수 있다.
+- `--camera-device` 는 `--camera` 와 같이 써야 하며 USB 카메라를 GStreamer `v4l2src` 로 연다.
+- `--camera-pipeline` 과 `--camera-device` 는 함께 쓸 수 없다.
+- `--camera-width`, `--camera-height` 는 `--camera` 직접 입력 또는 `--camera-device` 와 함께 쓸 수 있다.
 - `--camera-width`, `--camera-height` 는 짝수 양수여야 한다.
 - `--headless` 는 더 이상 지원하지 않는다.
 - `--rtsp-with-preview` 는 더 이상 지원하지 않는다.
+
+실행 모드 정리:
+
+1. `CSI 카메라 + libcamera 소스 + 로컬 송출`
+   - 기본 CSI 카메라 모드다.
+   - `--camera`
+   - `--rtsp` 를 붙이면 출력만 RTSP로 바뀌고 입력은 계속 `libcamera` 다.
+
+2. `CSI 카메라 + gstreamer 소스 + RTSP 송출`
+   - CSI 카메라를 `libcamerasrc` 같은 사용자 지정 파이프라인으로 직접 연다.
+   - `--camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1280,height=720 ! appsink" --rtsp`
+
+3. `USB 카메라 또는 이미지 파일 또는 동영상 파일 + gstreamer 소스 + 로컬 송출`
+   - USB 카메라: `--camera --camera-device /dev/video0 --camera-width 960 --camera-height 540`
+   - 이미지 파일: `--image ./frame.jpg`
+   - 동영상 파일: `--video ./sample.mp4`
+
+4. `USB 카메라 또는 이미지 파일 또는 동영상 파일 + gstreamer 소스 + RTSP 송출`
+   - USB 카메라: `--camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --rtsp`
+   - 이미지 파일: `--image ./frame.jpg --rtsp`
+   - 동영상 파일: `--video ./sample.mp4 --rtsp`
+
+입력 소스 선택 규칙:
+
+- `--camera` 만 사용하면 CSI 카메라를 `libcamera` 로 연다.
+- `--camera --camera-pipeline ...` 을 사용하면 CSI 카메라를 `gstreamer` 로 연다.
+- `--camera --camera-device /dev/videoX` 를 사용하면 USB 카메라를 `gstreamer v4l2src` 로 연다.
+- `--image`, `--video` 는 항상 `gstreamer` 입력이다.
+- `--rtsp` 는 입력 소스를 바꾸지 않고 출력만 RTSP 송출로 바꾼다.
+
+`--camera-pipeline` 권장 사용법:
+
+- `--camera-pipeline` 문자열은 입력 파이프라인만 넣는다.
+- 끝에 `appsink` 를 붙이지 않는다.
+- 현재 앱이 내부에서 `appsink` 를 자동으로 붙인다.
+- CSI 카메라에서 `gstreamer` 입력을 쓸 때는 아래 형태를 권장한다.
+
+권장 CSI GStreamer 입력 파이프라인:
+
+```bash
+libcamerasrc ! queue leaky=downstream max-size-buffers=1 ! videoconvert ! videorate drop-only=true ! videoscale add-borders=true ! video/x-raw,format=NV12,width=1280,height=720,pixel-aspect-ratio=1/1,framerate=30/1
+```
+
+권장 실행 옵션:
+
+1. CSI 카메라 + `libcamera` 소스 + 로컬 송출
+
+```bash
+./bin/catcheye-guard --camera --camera-width 1280 --camera-height 720
+```
+
+2. CSI 카메라 + `gstreamer` 소스 + RTSP 송출
+
+```bash
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! queue leaky=downstream max-size-buffers=1 ! videoconvert ! videorate drop-only=true ! videoscale add-borders=true ! video/x-raw,format=NV12,width=1280,height=720,pixel-aspect-ratio=1/1,framerate=30/1" --rtsp 8554
+```
+
+3. USB 카메라 + `gstreamer` 소스 + 로컬 송출
+
+```bash
+./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540
+```
+
+4. USB 카메라 + `gstreamer` 소스 + RTSP 송출
+
+```bash
+./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --rtsp 8554
+```
+
+5. 이미지 파일 + `gstreamer` 소스 + 로컬 송출
+
+```bash
+./bin/catcheye-guard --image ./frame.jpg
+```
+
+6. 이미지 파일 + `gstreamer` 소스 + RTSP 송출
+
+```bash
+./bin/catcheye-guard --image ./frame.jpg --rtsp 8554
+```
+
+7. 동영상 파일 + `gstreamer` 소스 + 로컬 송출
+
+```bash
+./bin/catcheye-guard --video ./sample.mp4
+```
+
+8. 동영상 파일 + `gstreamer` 소스 + RTSP 송출
+
+```bash
+./bin/catcheye-guard --video ./sample.mp4 --rtsp 8554
+```
 
 예시:
 
 ```bash
 ./bin/catcheye-guard --camera
 ./bin/catcheye-guard --camera --camera-width 960 --camera-height 540
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1280,height=720 ! appsink"
 ./bin/catcheye-guard --camera --rtsp 8554
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! queue leaky=downstream max-size-buffers=1 ! videoconvert ! videorate drop-only=true ! videoscale add-borders=true ! video/x-raw,format=NV12,width=1280,height=720,pixel-aspect-ratio=1/1,framerate=30/1" --rtsp 8554
+./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540
+./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --rtsp 8554
 ./bin/catcheye-guard --video ./sample.mp4 --num-threads 4
+./bin/catcheye-guard --video ./sample.mp4 --rtsp 8554
 ./bin/catcheye-guard --image ./frame.jpg ./models/model.ncnn.param ./models/model.ncnn.bin ./models/metadata.yaml ./models/roi_cam_default.json
 ```
 
