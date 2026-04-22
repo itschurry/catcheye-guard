@@ -49,8 +49,8 @@ EvaluationResult decision = evaluate_bbox_fully_inside(100, 50, 80, 150, parsed.
 - Docker 이미지는 ARM64 sysroot 안에 앱 의존성을 미리 준비한다.
 - `libcamera`는 Ubuntu 패키지를 쓰지 않고 Raspberry Pi용 소스를 직접 크로스빌드해서 sysroot에 넣는다.
 - 개발 PC에서는 그 sysroot를 사용해 크로스컴파일한다.
-- `cmake --install` 결과물에는 앱과 함께 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt`, `libcamera` 런타임과 IPA/tuning 데이터를 포함한다.
-- Raspberry Pi에는 카메라/미디어 런타임만 최소 설치하고 `install/aarch64`만 복사한다.
+- `cmake --install` 결과물에는 앱과 함께 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt` 런타임을 포함한다.
+- Raspberry Pi에는 `libcamera`와 카메라/미디어 런타임이 로컬에 준비되어 있어야 한다.
 
 사용 중인 툴체인 파일:
 - [`toolchains/aarch64-linux-gnu.cmake`](/home/user/catcheye-guard/toolchains/aarch64-linux-gnu.cmake)
@@ -84,9 +84,11 @@ gst-inspect-1.0 libcamerasrc
 
 이 프로젝트는 Docker 이미지 빌드 시 `raspberrypi/libcamera`를 소스 크로스빌드해서
 `${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu` 아래에 설치한다.
-`cmake --install` 단계에서 `libcamera` 라이브러리, IPA 모듈, tuning/config 데이터를
-함께 번들하고, 설치된 `bin/catcheye-guard` 래퍼가 그 번들을 우선 사용하게 만든다.
-그래서 Raspberry Pi에 별도로 같은 `libcamera`를 소스 빌드할 필요는 없다.
+크로스빌드에는 이 sysroot를 사용하지만, `cmake --install` 결과물에는 `libcamera` 런타임을
+번들하지 않는다. Raspberry Pi에는 로컬 `libcamera`, IPA 모듈, tuning/config 데이터가
+별도로 준비되어 있어야 한다.
+특히 `gstreamer`의 `libcamerasrc` 경로는 `libcamera` 런타임 세트와 강하게 결합되어 있어서,
+Raspberry Pi에서 직접 소스 빌드한 `libcamera` 환경을 기준으로 검증하는 것을 권장한다.
 
 ### 개발 PC에서 할 일
 
@@ -124,8 +126,8 @@ cmake --build /home/user/catcheye-guard/build/aarch64 -j$(nproc)
 cmake --install /home/user/catcheye-guard/build/aarch64 --prefix /home/user/catcheye-guard/install/aarch64
 ```
 
-`cmake --install` 단계에서 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt`, `libcamera` 런타임과
-`libcamera` IPA/tuning 데이터가 `install/aarch64` 아래로 함께 복사된다.
+`cmake --install` 단계에서 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt` 런타임이
+`install/aarch64` 아래로 함께 복사된다.
 
 ### 배포
 
@@ -140,9 +142,6 @@ ARM 장비에서 복사 결과 확인:
 ```bash
 ls /opt/catcheye-guard
 ls /opt/catcheye-guard/lib | grep ncnn
-ls /opt/catcheye-guard/lib | grep libcamera
-ls /opt/catcheye-guard/lib/aarch64-linux-gnu/libcamera
-ls /opt/catcheye-guard/share/libcamera
 ```
 
 ### 실행
@@ -155,13 +154,8 @@ cd /opt/catcheye-guard
 ```
 
 설치된 `bin/catcheye-guard` 는 래퍼 스크립트다.
-실제 바이너리는 `bin/catcheye-guard-bin` 이고, 래퍼가 아래 환경변수를 설정해서
-번들된 `libcamera` 런타임을 우선 사용한다.
-
-- `LD_LIBRARY_PATH`
-- `LIBCAMERA_IPA_MODULE_PATH`
-- `LIBCAMERA_IPA_PROXY_PATH`
-- `LIBCAMERA_IPA_CONFIG_PATH`
+실제 바이너리는 `bin/catcheye-guard-bin` 이고, 래퍼는 앱 번들 라이브러리 경로만 설정한다.
+`libcamera` 관련 런타임은 Raspberry Pi 로컬 환경을 그대로 사용한다.
 
 ### 실행 옵션
 
@@ -226,7 +220,7 @@ cd /opt/catcheye-guard
 
 2. `CSI 카메라 + gstreamer 소스 + RTSP 송출`
    - CSI 카메라를 `libcamerasrc` 같은 사용자 지정 파이프라인으로 직접 연다.
-   - `--camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1280,height=720 ! appsink" --rtsp`
+   - `--camera --camera-pipeline "libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip video-direction=vert" --rtsp`
 
 3. `USB 카메라 또는 이미지 파일 또는 동영상 파일 + gstreamer 소스 + 로컬 송출`
    - USB 카메라: `--camera --camera-device /dev/video0 --camera-width 960 --camera-height 540`
@@ -246,17 +240,18 @@ cd /opt/catcheye-guard
 - `--image`, `--video` 는 항상 `gstreamer` 입력이다.
 - `--rtsp` 는 입력 소스를 바꾸지 않고 출력만 RTSP 송출로 바꾼다.
 
-`--camera-pipeline` 권장 사용법:
+`--camera-pipeline` 참고용 사용법:
 
 - `--camera-pipeline` 문자열은 입력 파이프라인만 넣는다.
 - 끝에 `appsink` 를 붙이지 않는다.
 - 현재 앱이 내부에서 `appsink` 를 자동으로 붙인다.
-- CSI 카메라에서 `gstreamer` 입력을 쓸 때는 아래 형태를 권장한다.
+- 아래 파이프라인은 예전에 Raspberry Pi 로컬 `libcamera` 소스 빌드 환경에서 안정적으로 동작했던 `NV12 + videoflip` 기반 기준이다.
+- 현재 앱에서 `--camera-pipeline`은 입력 파이프라인 문자열만 주입하므로, 고급/실험 옵션으로 취급하는 것을 권장한다.
 
 권장 CSI GStreamer 입력 파이프라인:
 
 ```bash
-libcamerasrc ! queue leaky=downstream max-size-buffers=1 ! videoconvert ! videorate drop-only=true ! videoscale add-borders=true ! video/x-raw,format=NV12,width=1280,height=720,pixel-aspect-ratio=1/1,framerate=30/1
+libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip video-direction=vert
 ```
 
 권장 실행 옵션:
@@ -270,7 +265,7 @@ libcamerasrc ! queue leaky=downstream max-size-buffers=1 ! videoconvert ! videor
 2. CSI 카메라 + `gstreamer` 소스 + RTSP 송출
 
 ```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! queue leaky=downstream max-size-buffers=1 ! videoconvert ! videorate drop-only=true ! videoscale add-borders=true ! video/x-raw,format=NV12,width=1280,height=720,pixel-aspect-ratio=1/1,framerate=30/1" --rtsp 8554
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip video-direction=vert" --rtsp 8554
 ```
 
 3. USB 카메라 + `gstreamer` 소스 + 로컬 송출
@@ -315,7 +310,7 @@ libcamerasrc ! queue leaky=downstream max-size-buffers=1 ! videoconvert ! videor
 ./bin/catcheye-guard --camera
 ./bin/catcheye-guard --camera --camera-width 960 --camera-height 540
 ./bin/catcheye-guard --camera --rtsp 8554
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! queue leaky=downstream max-size-buffers=1 ! videoconvert ! videorate drop-only=true ! videoscale add-borders=true ! video/x-raw,format=NV12,width=1280,height=720,pixel-aspect-ratio=1/1,framerate=30/1" --rtsp 8554
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip video-direction=vert" --rtsp 8554
 ./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540
 ./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --rtsp 8554
 ./bin/catcheye-guard --video ./sample.mp4 --num-threads 4

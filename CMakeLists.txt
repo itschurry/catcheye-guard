@@ -299,8 +299,6 @@ if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gn
         DIRECTORY "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/"
         DESTINATION ${CMAKE_INSTALL_LIBDIR}
         FILES_MATCHING
-        PATTERN "libcamera*.so"
-        PATTERN "libcamera*.so.*"
         PATTERN "libopencv*.so"
         PATTERN "libopencv*.so.*"
         PATTERN "libyaml-cpp*.so"
@@ -310,21 +308,8 @@ if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gn
         PATTERN "libfmt*.so"
         PATTERN "libfmt*.so.*"
     )
-    if(EXISTS "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/libcamera")
-        install(
-            DIRECTORY "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/libcamera/"
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/aarch64-linux-gnu/libcamera
-        )
-    endif()
 else()
     message(WARNING "TARGET_SYSROOT runtime libraries not found; bundled third-party runtime libs will be incomplete")
-endif()
-
-if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}/usr/share/libcamera")
-    install(
-        DIRECTORY "${TARGET_SYSROOT}/usr/share/libcamera/"
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/libcamera
-    )
 endif()
 
 install(EXPORT catcheye_guard_targets
