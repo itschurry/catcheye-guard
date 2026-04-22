@@ -138,7 +138,62 @@ ARM 장비에서:
 
 ```bash
 cd /opt/catcheye-guard
-./bin/catcheye-guard --camera --headless
+./bin/catcheye-guard --camera
+```
+
+### 실행 옵션
+
+기본 형식:
+
+```bash
+./bin/catcheye-guard [입력 옵션] [부가 옵션] [model.param] [model.bin] [metadata.yaml] [roi.json]
+```
+
+입력 옵션:
+
+- `--camera`
+  - 카메라 입력을 사용한다.
+- `--camera-pipeline <pipeline>`
+  - 카메라 입력에서만 사용 가능하다.
+- `--image <path>`
+  - 이미지 파일 입력을 사용한다.
+- `--video <path>`
+  - 비디오 파일 입력을 사용한다.
+
+부가 옵션:
+
+- `--rtsp [port]`
+  - RTSP 결과 송출을 켠다.
+  - 포트를 생략하면 기본 포트를 사용한다.
+- `--num-threads <n>`
+  - NCNN 추론 스레드 수를 지정한다.
+
+위치 인자:
+
+- `model.param`
+  - 기본 NCNN param 경로를 덮어쓴다.
+- `model.bin`
+  - 기본 NCNN bin 경로를 덮어쓴다.
+- `metadata.yaml`
+  - 기본 메타데이터 경로를 덮어쓴다.
+- `roi.json`
+  - 기본 ROI 설정 파일 경로를 덮어쓴다.
+
+주의:
+
+- 입력 모드 `--camera`, `--image`, `--video` 는 서로 동시에 쓸 수 없다.
+- `--camera-pipeline` 은 `--camera` 와 같이 써야 한다.
+- `--headless` 는 더 이상 지원하지 않는다.
+- `--rtsp-with-preview` 는 더 이상 지원하지 않는다.
+
+예시:
+
+```bash
+./bin/catcheye-guard --camera
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1280,height=720 ! appsink"
+./bin/catcheye-guard --camera --rtsp 8554
+./bin/catcheye-guard --video ./sample.mp4 --num-threads 4
+./bin/catcheye-guard --image ./frame.jpg ./models/model.ncnn.param ./models/model.ncnn.bin ./models/metadata.yaml ./models/roi_cam_default.json
 ```
 
 ### 문제 생기면 확인
