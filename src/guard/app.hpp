@@ -15,7 +15,6 @@ namespace catcheye::guard {
 struct AppOptions {
     catcheye::input::InputSourceConfig input;
     bool publish_results = false;
-    bool render_preview = true;
     int rtsp_port = 8554;
     int num_threads = 2;
     std::vector<std::string> positional_args;

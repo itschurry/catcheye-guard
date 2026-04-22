@@ -124,7 +124,7 @@ void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_co
 void draw_detections(
     cv::Mat& image,
     const std::vector<EvaluatedDetection>& detections,
-    const Detector& detector,
+    const IDetector& detector,
     bool roi_enabled) {
     for (const EvaluatedDetection& evaluated_detection : detections) {
         const cv::Rect box = to_rect(evaluated_detection.detection.box);

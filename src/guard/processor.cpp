@@ -10,7 +10,6 @@
 #include "catcheye/roi/roi_validation.hpp"
 #include "catcheye/utils/logger.hpp"
 #include "guard/detector_factory.hpp" // create_detector
-#include "guard/preview_renderer.hpp"
 #include "guard/roi_reload.hpp"
 
 namespace catcheye {
@@ -142,40 +141,13 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
     }
 
     catcheye::runtime::ProcessOutput output;
-    if (!context.needs_preview && !context.needs_publish) {
+    if (!context.needs_publish) {
         return output;
     }
 
-    cv::Mat preview = frame.image.clone();
-    if (config_.roi_enabled) {
-        if (frame.width() != config_.roi_config.image_width || frame.height() != config_.roi_config.image_height) {
-            if (!roi_frame_size_warning_emitted_) {
-                roi_frame_size_warning_emitted_ = true;
-                if (const auto log = logger()) {
-                    log->warn("frame {}x{} != ROI config {}x{}", frame.width(), frame.height(), config_.roi_config.image_width,
-                              config_.roi_config.image_height);
-                }
-            }
-        } else {
-            roi_frame_size_warning_emitted_ = false;
-        }
-        draw_roi_zones(preview, config_.roi_config);
-    }
-
-    // draw_detections 의 Detector& → IDetector& 로 시그니처 변경 필요 (아래 preview_renderer 참고)
-    draw_detections(preview, evaluated_detections, *detector_, config_.roi_enabled);
-
-    if (context.needs_preview) {
-        output.has_preview = true;
-        output.preview_frame = preview.clone();
-    }
-
-    if (context.needs_publish) {
-        output.has_message = true;
-        output.message = catcheye::protocol::encode_jpeg_frame(
-            preview, build_metadata_json(evaluated_detections, *detector_, config_.roi_enabled), "person-guard", jpeg_quality_);
-    }
-
+    output.has_message = true;
+    output.message.stream_name = "person-guard";
+    output.message.metadata_json = build_metadata_json(evaluated_detections, *detector_, config_.roi_enabled);
     return output;
 }
 

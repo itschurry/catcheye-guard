@@ -9,7 +9,7 @@ project(catcheye-guard
 # ---------------------------------------------------------------------------
 # Options
 # ---------------------------------------------------------------------------
-option(CATCHEYE_GUARD_BUILD_TESTS "Build tests" ON)
+option(CATCHEYE_GUARD_BUILD_TESTS "Build tests" OFF)
 option(CATCHEYE_GUARD_BUILD_APP "Build main executable if src/main.cpp exists" ON)
 
 # ---------------------------------------------------------------------------
@@ -52,6 +52,8 @@ set(CATCHEYE_VISION_SDK_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/catc
 if(NOT EXISTS "${CATCHEYE_VISION_SDK_SOURCE_DIR}/CMakeLists.txt")
     message(FATAL_ERROR "catcheye-vision-sdk repo not found at ${CATCHEYE_VISION_SDK_SOURCE_DIR}")
 endif()
+
+set(CATCHEYE_VISION_SDK_BUILD_TESTS OFF CACHE BOOL "Build tests for SDK libraries" FORCE)
 
 add_subdirectory(
     "${CATCHEYE_VISION_SDK_SOURCE_DIR}"

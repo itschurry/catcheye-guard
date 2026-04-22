@@ -1,13 +1,17 @@
 #include "guard/ncnn_detector.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
+#include <cstddef>
+#include <cstring>
 #include <utility>
 
 #include <opencv2/dnn/dnn.hpp>
 #include <opencv2/imgproc.hpp>
 #include <yaml-cpp/yaml.h>
 
+#include "catcheye/input/pixel_format.hpp"
 #include "catcheye/utils/logger.hpp"
 
 namespace catcheye {
@@ -19,6 +23,73 @@ struct LetterboxResult {
     int pad_width   = 0;
     int pad_height  = 0;
 };
+
+cv::Mat frame_to_bgr(const catcheye::input::Frame& frame)
+{
+    if (frame.empty() || frame.width <= 0 || frame.height <= 0 || frame.stride <= 0) {
+        return {};
+    }
+
+    const std::size_t expected_size =
+        catcheye::input::frame_data_size(frame.format, frame.stride, frame.height);
+    if (frame.data.size() < expected_size) {
+        if (const auto log = logger()) {
+            log->error(
+                "frame buffer too small: actual={}, expected={}, format={}",
+                frame.data.size(),
+                expected_size,
+                static_cast<int>(frame.format));
+        }
+        return {};
+    }
+
+    const auto* raw = frame.data.data();
+    switch (frame.format) {
+        case catcheye::input::PixelFormat::BGR: {
+            cv::Mat wrapped(frame.height, frame.width, CV_8UC3, const_cast<std::uint8_t*>(raw), static_cast<std::size_t>(frame.stride));
+            return wrapped.clone();
+        }
+        case catcheye::input::PixelFormat::RGB: {
+            cv::Mat wrapped(frame.height, frame.width, CV_8UC3, const_cast<std::uint8_t*>(raw), static_cast<std::size_t>(frame.stride));
+            cv::Mat bgr;
+            cv::cvtColor(wrapped, bgr, cv::COLOR_RGB2BGR);
+            return bgr;
+        }
+        case catcheye::input::PixelFormat::RGBA: {
+            cv::Mat wrapped(frame.height, frame.width, CV_8UC4, const_cast<std::uint8_t*>(raw), static_cast<std::size_t>(frame.stride));
+            cv::Mat bgr;
+            cv::cvtColor(wrapped, bgr, cv::COLOR_RGBA2BGR);
+            return bgr;
+        }
+        case catcheye::input::PixelFormat::BGRA: {
+            cv::Mat wrapped(frame.height, frame.width, CV_8UC4, const_cast<std::uint8_t*>(raw), static_cast<std::size_t>(frame.stride));
+            cv::Mat bgr;
+            cv::cvtColor(wrapped, bgr, cv::COLOR_BGRA2BGR);
+            return bgr;
+        }
+        case catcheye::input::PixelFormat::GRAY8: {
+            cv::Mat wrapped(frame.height, frame.width, CV_8UC1, const_cast<std::uint8_t*>(raw), static_cast<std::size_t>(frame.stride));
+            cv::Mat bgr;
+            cv::cvtColor(wrapped, bgr, cv::COLOR_GRAY2BGR);
+            return bgr;
+        }
+        case catcheye::input::PixelFormat::NV12: {
+            cv::Mat wrapped(frame.height + (frame.height / 2), frame.width, CV_8UC1, const_cast<std::uint8_t*>(raw),
+                            static_cast<std::size_t>(frame.stride));
+            cv::Mat bgr;
+            cv::cvtColor(wrapped, bgr, cv::COLOR_YUV2BGR_NV12);
+            return bgr;
+        }
+        case catcheye::input::PixelFormat::UNKNOWN:
+        default:
+            break;
+    }
+
+    if (const auto log = logger()) {
+        log->error("unsupported pixel format: {}", static_cast<int>(frame.format));
+    }
+    return {};
+}
 
 std::map<int, std::string> load_class_names(const std::string& yaml_path)
 {
@@ -256,8 +327,13 @@ std::vector<Detection> NcnnDetector::detect(const catcheye::input::Frame& frame)
         return {};
     }
 
+    const cv::Mat bgr = frame_to_bgr(frame);
+    if (bgr.empty()) {
+        return {};
+    }
+
     const LetterboxResult preprocessed = letterbox(
-        frame.image, config_.input_width, config_.input_height);
+        bgr, config_.input_width, config_.input_height);
 
     cv::Mat rgb;
     cv::cvtColor(preprocessed.image, rgb, cv::COLOR_BGR2RGB);
@@ -291,8 +367,8 @@ std::vector<Detection> NcnnDetector::detect(const catcheye::input::Frame& frame)
         preprocessed.scale,
         preprocessed.pad_width,
         preprocessed.pad_height,
-        frame.width(),
-        frame.height());
+        frame.width,
+        frame.height);
 }
 
 std::string NcnnDetector::class_name(int class_id) const

@@ -78,16 +78,14 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.input.camera_pipeline = args[++i];
         } else if (arg == "--rtsp") {
             options.publish_results = true;
-            options.render_preview = false;
             if (i + 1 < args.size() && args[i + 1][0] != '-') {
                 ++i;
                 options.rtsp_port = std::stoi(args[i]);
             }
         } else if (arg == "--rtsp-with-preview") {
-            options.publish_results = true;
-            options.render_preview = true;
+            throw std::runtime_error("--rtsp-with-preview is no longer supported; use --rtsp");
         } else if (arg == "--headless") {
-            options.render_preview = false;
+            throw std::runtime_error("--headless is no longer needed; preview output is not supported");
         } else if (arg == "--num-threads" && i + 1 < args.size()) {
             ++i;
             options.num_threads = std::stoi(args[i]);
@@ -162,8 +160,6 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     bootstrap.processor_config.roi_config_path = loaded_roi_config.path;
     bootstrap.processor_config.roi_config = loaded_roi_config.config;
 
-    bootstrap.runtime_config.window_name = "CatchEye Person Guard";
-    bootstrap.runtime_config.render_preview = options.render_preview;
     bootstrap.runtime_config.process_every_n_frames = 2;
     bootstrap.publish_results = options.publish_results;
     bootstrap.publisher_config.port = options.rtsp_port;
@@ -184,8 +180,8 @@ int run_app(int argc, char** argv) {
     AppBootstrap bootstrap = build_app_bootstrap(options, default_paths, loaded_roi_config);
 
     if (const auto log = logger()) {
-        log->info("catcheye-guard starting (ROI='{}', preview={}, rtsp={})", bootstrap.processor_config.roi_config_path,
-                  bootstrap.runtime_config.render_preview, bootstrap.publish_results);
+        log->info("catcheye-guard starting (ROI='{}', rtsp={})", bootstrap.processor_config.roi_config_path,
+                  bootstrap.publish_results);
     }
 
     std::unique_ptr<catcheye::transport::ResultPublisher> publisher;
