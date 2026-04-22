@@ -7,7 +7,7 @@
 #include "catcheye/input/frame_source.hpp"
 #include "catcheye/roi/camera_roi_config.hpp"
 #include "catcheye/runtime/frame_processing_runner.hpp"
-#include "catcheye/transport/websocket_publisher.hpp"
+#include "catcheye/transport/rtsp_publisher.hpp"
 #include "guard/processor_config.hpp"
 
 namespace catcheye::guard {
@@ -16,7 +16,7 @@ struct AppOptions {
     catcheye::input::InputSourceConfig input;
     bool publish_results = false;
     bool render_preview = true;
-    int websocket_port = 8080;
+    int rtsp_port = 8554;
     int num_threads = 2;
     std::vector<std::string> positional_args;
 };
@@ -36,7 +36,7 @@ struct LoadedRoiConfig {
 struct AppBootstrap {
     GuardProcessorConfig processor_config;
     catcheye::runtime::RuntimeConfig runtime_config;
-    catcheye::transport::WebSocketPublisherConfig publisher_config;
+    catcheye::transport::RtspPublisherConfig publisher_config;
     bool publish_results = false;
     std::unique_ptr<catcheye::input::FrameSource> source;
 };

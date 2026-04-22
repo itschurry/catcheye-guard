@@ -12,7 +12,7 @@
 #include "catcheye/roi/roi_repository.hpp"
 #include "catcheye/roi/roi_validation.hpp"
 #include "catcheye/runtime/frame_processing_runner.hpp"
-#include "catcheye/transport/websocket_publisher.hpp"
+#include "catcheye/transport/rtsp_publisher.hpp"
 #include "catcheye/utils/logger.hpp"
 #include "guard/processor.hpp"
 
@@ -76,14 +76,14 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.input.type = catcheye::input::InputSourceType::Camera;
         } else if (arg == "--camera-pipeline" && i + 1 < args.size()) {
             options.input.camera_pipeline = args[++i];
-        } else if (arg == "--ws") {
+        } else if (arg == "--rtsp") {
             options.publish_results = true;
             options.render_preview = false;
             if (i + 1 < args.size() && args[i + 1][0] != '-') {
                 ++i;
-                options.websocket_port = std::stoi(args[i]);
+                options.rtsp_port = std::stoi(args[i]);
             }
-        } else if (arg == "--ws-with-preview") {
+        } else if (arg == "--rtsp-with-preview") {
             options.publish_results = true;
             options.render_preview = true;
         } else if (arg == "--headless") {
@@ -166,7 +166,7 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     bootstrap.runtime_config.render_preview = options.render_preview;
     bootstrap.runtime_config.process_every_n_frames = 2;
     bootstrap.publish_results = options.publish_results;
-    bootstrap.publisher_config.port = options.websocket_port;
+    bootstrap.publisher_config.port = options.rtsp_port;
 
     if (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty()) {
         throw std::runtime_error("NCNN model paths are required");
@@ -184,13 +184,13 @@ int run_app(int argc, char** argv) {
     AppBootstrap bootstrap = build_app_bootstrap(options, default_paths, loaded_roi_config);
 
     if (const auto log = logger()) {
-        log->info("catcheye-guard starting (ROI='{}', preview={}, ws={})", bootstrap.processor_config.roi_config_path,
+        log->info("catcheye-guard starting (ROI='{}', preview={}, rtsp={})", bootstrap.processor_config.roi_config_path,
                   bootstrap.runtime_config.render_preview, bootstrap.publish_results);
     }
 
     std::unique_ptr<catcheye::transport::ResultPublisher> publisher;
     if (bootstrap.publish_results) {
-        publisher = std::make_unique<catcheye::transport::WebSocketPublisher>(bootstrap.publisher_config);
+        publisher = std::make_unique<catcheye::transport::RtspPublisher>(bootstrap.publisher_config);
     }
 
     auto processor = std::make_unique<catcheye::GuardProcessor>(std::move(bootstrap.processor_config));
