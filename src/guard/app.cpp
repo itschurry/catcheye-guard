@@ -19,6 +19,19 @@
 namespace catcheye::guard {
 namespace {
 
+const char* publisher_name(PublisherType type) {
+    switch (type) {
+    case PublisherType::Rtsp:
+        return "rtsp";
+    case PublisherType::WebSocket:
+        return "websocket";
+    case PublisherType::None:
+        return "local";
+    }
+
+    return "unknown";
+}
+
 std::string resolve_default_model_path(const char* executable_path, const std::string& relative_path) {
     namespace fs = std::filesystem;
 
@@ -46,31 +59,25 @@ bool is_input_mode(const std::string& arg) {
 
 std::string describe_runtime_mode(const AppOptions& options)
 {
-    const bool rtsp_enabled = options.publish_results;
+    const bool rtsp_enabled = options.publisher_type == PublisherType::Rtsp;
+    const bool websocket_enabled = options.publisher_type == PublisherType::WebSocket;
+    const char* output_name = rtsp_enabled ? "rtsp output" : (websocket_enabled ? "websocket output" : "local output");
 
     if (options.input.type == catcheye::input::InputSourceType::Camera) {
         if (!options.input.camera_pipeline.empty()) {
-            return rtsp_enabled
-                ? "csi camera + gstreamer source + rtsp output"
-                : "csi camera + gstreamer source + local output";
+            return std::string("csi camera + gstreamer source + ") + output_name;
         }
         if (!options.input.camera_device.empty()) {
-            return rtsp_enabled
-                ? "usb camera + gstreamer source + rtsp output"
-                : "usb camera + gstreamer source + local output";
+            return std::string("usb camera + gstreamer source + ") + output_name;
         }
-        return rtsp_enabled
-            ? "csi camera + libcamera source + rtsp output"
-            : "csi camera + libcamera source + local output";
+        return std::string("csi camera + libcamera source + ") + output_name;
     }
 
     const char* input_name =
         options.input.type == catcheye::input::InputSourceType::ImageFile
         ? "image file"
         : "video file";
-    return std::string(input_name)
-        + " + gstreamer source + "
-        + (rtsp_enabled ? "rtsp output" : "local output");
+    return std::string(input_name) + " + gstreamer source + " + output_name;
 }
 
 } // namespace
@@ -112,20 +119,34 @@ AppOptions parse_app_options(int argc, char** argv) {
         } else if (arg == "--camera-height" && i + 1 < args.size()) {
             options.input.camera_height = std::stoi(args[++i]);
         } else if (arg == "--rtsp") {
-            options.publish_results = true;
+            if (options.publisher_type != PublisherType::None) {
+                throw std::runtime_error("only one publisher can be selected at a time");
+            }
+            options.publisher_type = PublisherType::Rtsp;
             if (i + 1 < args.size() && args[i + 1][0] != '-') {
                 ++i;
                 options.rtsp_port = std::stoi(args[i]);
             }
+        } else if (arg == "--ws") {
+            if (options.publisher_type != PublisherType::None) {
+                throw std::runtime_error("only one publisher can be selected at a time");
+            }
+            options.publisher_type = PublisherType::WebSocket;
+            if (i + 1 < args.size() && args[i + 1][0] != '-') {
+                ++i;
+                options.websocket_port = std::stoi(args[i]);
+            }
         } else if (arg == "--rtsp-with-preview") {
             throw std::runtime_error("--rtsp-with-preview is no longer supported; use --rtsp");
+        } else if (arg == "--ws-with-preview") {
+            throw std::runtime_error("--ws-with-preview is no longer supported; use --ws");
         } else if (arg == "--headless") {
             throw std::runtime_error("--headless is no longer needed; preview output is not supported");
         } else if (arg == "--num-threads" && i + 1 < args.size()) {
             ++i;
             options.num_threads = std::stoi(args[i]);
         } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" ||
-                   arg == "--camera-device" ||
+                   arg == "--camera-device" || arg == "--ws" ||
                    arg == "--camera-width" || arg == "--camera-height" || arg == "--num-threads") {
             throw std::runtime_error("missing value for flag: " + arg);
         } else if (is_input_mode(arg)) {
@@ -221,10 +242,11 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     bootstrap.processor_config.roi_config = loaded_roi_config.config;
 
     bootstrap.runtime_config.process_every_n_frames = 2;
-    bootstrap.publish_results = options.publish_results;
-    bootstrap.publisher_config.port = options.rtsp_port;
-    bootstrap.publisher_config.width = options.input.camera_width;
-    bootstrap.publisher_config.height = options.input.camera_height;
+    bootstrap.publisher_type = options.publisher_type;
+    bootstrap.rtsp_publisher_config.port = options.rtsp_port;
+    bootstrap.rtsp_publisher_config.width = options.input.camera_width;
+    bootstrap.rtsp_publisher_config.height = options.input.camera_height;
+    bootstrap.websocket_publisher_config.port = options.websocket_port;
 
     if (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty()) {
         throw std::runtime_error("NCNN model paths are required");
@@ -242,15 +264,17 @@ int run_app(int argc, char** argv) {
     AppBootstrap bootstrap = build_app_bootstrap(options, default_paths, loaded_roi_config);
 
     if (const auto log = logger()) {
-        log->info("catcheye-guard starting (mode='{}', ROI='{}', rtsp={})",
+        log->info("catcheye-guard starting (mode='{}', ROI='{}', publisher='{}')",
                   describe_runtime_mode(options),
                   bootstrap.processor_config.roi_config_path,
-                  bootstrap.publish_results);
+                  publisher_name(bootstrap.publisher_type));
     }
 
     std::unique_ptr<catcheye::transport::ResultPublisher> publisher;
-    if (bootstrap.publish_results) {
-        publisher = std::make_unique<catcheye::transport::RtspPublisher>(bootstrap.publisher_config);
+    if (bootstrap.publisher_type == PublisherType::Rtsp) {
+        publisher = std::make_unique<catcheye::transport::RtspPublisher>(bootstrap.rtsp_publisher_config);
+    } else if (bootstrap.publisher_type == PublisherType::WebSocket) {
+        publisher = std::make_unique<catcheye::transport::WebSocketPublisher>(bootstrap.websocket_publisher_config);
     }
 
     auto processor = std::make_unique<catcheye::GuardProcessor>(std::move(bootstrap.processor_config));

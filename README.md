@@ -167,6 +167,7 @@ cd /opt/catcheye-guard
 부가 옵션:
 
 - `--rtsp [port]`: RTSP 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
+- `--ws [port]`: WebSocket 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
 - `--num-threads <n>`: NCNN 추론 스레드 수를 지정한다.
 
 위치 인자:
@@ -181,11 +182,13 @@ cd /opt/catcheye-guard
 - 입력 모드 `--camera`, `--image`, `--video` 는 서로 동시에 쓸 수 없다.
 - `--camera-pipeline`, `--camera-device` 는 `--camera` 와 같이 써야 한다.
 - `--camera-pipeline` 과 `--camera-device` 는 함께 쓸 수 없다.
+- `--rtsp` 와 `--ws` 는 함께 쓸 수 없다.
 - `--camera-width`, `--camera-height` 는 `--camera` 와 함께만 사용할 수 있다.
 - `--camera-pipeline` 사용 시 `--camera-width`, `--camera-height` 는 지원하지 않는다.
 - `--camera-width`, `--camera-height` 는 짝수 양수여야 한다.
 - `--headless` 는 더 이상 지원하지 않는다.
 - `--rtsp-with-preview` 는 더 이상 지원하지 않는다.
+- `--ws-with-preview` 는 더 이상 지원하지 않는다.
 
 입력 소스 선택 규칙:
 
@@ -194,6 +197,14 @@ cd /opt/catcheye-guard
 - `--camera --camera-device /dev/videoX` 를 사용하면 USB 카메라를 `gstreamer v4l2src` 로 연다.
 - `--image`, `--video` 는 항상 `gstreamer` 입력이다.
 - `--rtsp` 는 입력 소스를 바꾸지 않고 출력만 RTSP 송출로 바꾼다.
+- `--ws` 는 입력 소스를 바꾸지 않고 출력만 WebSocket 송출로 바꾼다.
+
+WebSocket 송출 형식:
+
+- 클라이언트는 `ws://<host>:<port>/` 로 접속한다.
+- 프레임마다 텍스트 프레임 1개와 바이너리 프레임 1개를 순서대로 받는다.
+- 텍스트 프레임에는 `frame_index`, `stream_name`, `width`, `height`, `stride`, `pixel_format`, `timestamp`, `payload_size`, `metadata` 가 JSON으로 담긴다.
+- 바이너리 프레임에는 원본 `Frame::data` 바이트가 그대로 담긴다.
 
 ## 권장 실행 예시
 
@@ -223,6 +234,12 @@ CSI 카메라 + `gstreamer` 소스 + RTSP 송출:
 ./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip video-direction=vert" --rtsp 8554
 ```
 
+CSI 카메라 + `gstreamer` 소스 + WebSocket 송출:
+
+```bash
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip video-direction=vert" --ws 8080
+```
+
 USB 카메라 + `gstreamer` 소스:
 
 ```bash
@@ -233,6 +250,12 @@ USB 카메라 + `gstreamer` 소스 + RTSP 송출:
 
 ```bash
 ./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --rtsp 8554
+```
+
+USB 카메라 + `gstreamer` 소스 + WebSocket 송출:
+
+```bash
+./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --ws 8080
 ```
 
 이미지 파일 입력:
@@ -247,6 +270,12 @@ USB 카메라 + `gstreamer` 소스 + RTSP 송출:
 ./bin/catcheye-guard --image ./frame.jpg --rtsp 8554
 ```
 
+이미지 파일 입력 + WebSocket 송출:
+
+```bash
+./bin/catcheye-guard --image ./frame.jpg --ws 8080
+```
+
 동영상 파일 입력:
 
 ```bash
@@ -257,6 +286,12 @@ USB 카메라 + `gstreamer` 소스 + RTSP 송출:
 
 ```bash
 ./bin/catcheye-guard --video ./sample.mp4 --rtsp 8554
+```
+
+동영상 파일 입력 + WebSocket 송출:
+
+```bash
+./bin/catcheye-guard --video ./sample.mp4 --ws 8080
 ```
 
 모델/메타데이터/ROI 경로를 함께 넘기는 예시:
