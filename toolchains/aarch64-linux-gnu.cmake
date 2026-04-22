@@ -27,6 +27,10 @@ else()
     set(TARGET_SYSROOT "/opt/sysroots/raspi" CACHE PATH "Target sysroot" FORCE)
 endif()
 
+set(CMAKE_SYSROOT "${TARGET_SYSROOT}")
+set(CMAKE_SYSROOT_COMPILE "${TARGET_SYSROOT}")
+set(CMAKE_SYSROOT_LINK "${TARGET_SYSROOT}")
+
 set(CMAKE_FIND_ROOT_PATH
     "${TARGET_SYSROOT}"
     "/usr/aarch64-linux-gnu"

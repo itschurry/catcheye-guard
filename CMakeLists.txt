@@ -114,10 +114,11 @@ target_link_libraries(catcheye_guard
         catcheye::vision_protocol
         catcheye::vision_runtime
         catcheye::vision_transport
+        ${OpenCV_LIBS}
         ncnn
         spdlog::spdlog
     PRIVATE
-        yaml-cpp
+        yaml-cpp::yaml-cpp
 )
 
 set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")

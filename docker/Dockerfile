@@ -64,6 +64,8 @@ RUN set -eux; \
     libopencv-dev:arm64 \
     libyaml-cpp-dev:arm64 \
     libspdlog-dev:arm64 \
+    libblas-dev:arm64 \
+    liblapack-dev:arm64 \
     libjpeg-dev:arm64 \
     libpng-dev:arm64 \
     libtiff5-dev:arm64; \
