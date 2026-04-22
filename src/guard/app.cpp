@@ -76,6 +76,10 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.input.type = catcheye::input::InputSourceType::Camera;
         } else if (arg == "--camera-pipeline" && i + 1 < args.size()) {
             options.input.camera_pipeline = args[++i];
+        } else if (arg == "--camera-width" && i + 1 < args.size()) {
+            options.input.camera_width = std::stoi(args[++i]);
+        } else if (arg == "--camera-height" && i + 1 < args.size()) {
+            options.input.camera_height = std::stoi(args[++i]);
         } else if (arg == "--rtsp") {
             options.publish_results = true;
             if (i + 1 < args.size() && args[i + 1][0] != '-') {
@@ -89,7 +93,8 @@ AppOptions parse_app_options(int argc, char** argv) {
         } else if (arg == "--num-threads" && i + 1 < args.size()) {
             ++i;
             options.num_threads = std::stoi(args[i]);
-        } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" || arg == "--num-threads") {
+        } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" ||
+                   arg == "--camera-width" || arg == "--camera-height" || arg == "--num-threads") {
             throw std::runtime_error("missing value for flag: " + arg);
         } else if (is_input_mode(arg)) {
             throw std::runtime_error("input mode flags are mutually exclusive");
@@ -102,6 +107,25 @@ AppOptions parse_app_options(int argc, char** argv) {
          options.input.type == catcheye::input::InputSourceType::VideoFile) &&
         !options.input.camera_pipeline.empty()) {
         throw std::runtime_error("--camera-pipeline is only valid with --camera");
+    }
+
+    if (!options.input.camera_pipeline.empty() &&
+        (options.input.camera_width != 1280 || options.input.camera_height != 720)) {
+        throw std::runtime_error("--camera-width and --camera-height are not supported with --camera-pipeline");
+    }
+
+    if ((options.input.type == catcheye::input::InputSourceType::ImageFile ||
+         options.input.type == catcheye::input::InputSourceType::VideoFile) &&
+        (options.input.camera_width != 1280 || options.input.camera_height != 720)) {
+        throw std::runtime_error("--camera-width and --camera-height are only valid with --camera");
+    }
+
+    if (options.input.camera_width <= 0 || options.input.camera_height <= 0) {
+        throw std::runtime_error("camera dimensions must be positive integers");
+    }
+
+    if ((options.input.camera_width % 2) != 0 || (options.input.camera_height % 2) != 0) {
+        throw std::runtime_error("camera dimensions must be even for NV12/RTSP output");
     }
 
     if ((options.input.type == catcheye::input::InputSourceType::ImageFile ||
@@ -163,6 +187,8 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     bootstrap.runtime_config.process_every_n_frames = 2;
     bootstrap.publish_results = options.publish_results;
     bootstrap.publisher_config.port = options.rtsp_port;
+    bootstrap.publisher_config.width = options.input.camera_width;
+    bootstrap.publisher_config.height = options.input.camera_height;
 
     if (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty()) {
         throw std::runtime_error("NCNN model paths are required");

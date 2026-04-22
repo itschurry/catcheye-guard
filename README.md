@@ -175,8 +175,13 @@ cd /opt/catcheye-guard
 
 - `--camera`
   - 카메라 입력을 사용한다.
+  - 카메라는 180도 회전으로 고정 보정한다.
 - `--camera-pipeline <pipeline>`
   - 카메라 입력에서만 사용 가능하다.
+- `--camera-width <width>`
+  - `--camera` 직접 입력 해상도 너비를 지정한다.
+- `--camera-height <height>`
+  - `--camera` 직접 입력 해상도 높이를 지정한다.
 - `--image <path>`
   - 이미지 파일 입력을 사용한다.
 - `--video <path>`
@@ -205,6 +210,8 @@ cd /opt/catcheye-guard
 
 - 입력 모드 `--camera`, `--image`, `--video` 는 서로 동시에 쓸 수 없다.
 - `--camera-pipeline` 은 `--camera` 와 같이 써야 한다.
+- `--camera-width`, `--camera-height` 는 `--camera` 직접 입력에서만 쓸 수 있다.
+- `--camera-width`, `--camera-height` 는 짝수 양수여야 한다.
 - `--headless` 는 더 이상 지원하지 않는다.
 - `--rtsp-with-preview` 는 더 이상 지원하지 않는다.
 
@@ -212,6 +219,7 @@ cd /opt/catcheye-guard
 
 ```bash
 ./bin/catcheye-guard --camera
+./bin/catcheye-guard --camera --camera-width 960 --camera-height 540
 ./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1280,height=720 ! appsink"
 ./bin/catcheye-guard --camera --rtsp 8554
 ./bin/catcheye-guard --video ./sample.mp4 --num-threads 4
