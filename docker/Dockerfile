@@ -66,6 +66,8 @@ RUN set -eux; \
     libspdlog-dev:arm64 \
     libblas-dev:arm64 \
     liblapack-dev:arm64 \
+    libopenblas0-pthread:arm64 \
+    libopenblas-pthread-dev:arm64 \
     libjpeg-dev:arm64 \
     libpng-dev:arm64 \
     libtiff5-dev:arm64; \
@@ -74,6 +76,21 @@ RUN set -eux; \
     [ -e "${pkg}" ] || continue; \
     dpkg-deb -x "${pkg}" "${TARGET_SYSROOT}"; \
     done; \
+    mkdir -p "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu"; \
+    for lib in blas lapack openblas; do \
+    for suffix in .so .so.3; do \
+    target="${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/openblas-pthread/lib${lib}${suffix}"; \
+    link="${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/lib${lib}${suffix}"; \
+    if [ -e "${target}" ] && [ ! -e "${link}" ]; then \
+    ln -s "openblas-pthread/lib${lib}${suffix}" "${link}"; \
+    fi; \
+    done; \
+    done; \
+    if [ -e "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/openblas-pthread/libopenblas.so.0" ] && \
+       [ ! -e "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/libopenblas.so.0" ]; then \
+    ln -s "openblas-pthread/libopenblas.so.0" \
+       "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/libopenblas.so.0"; \
+    fi; \
     \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/sysroot-debs

@@ -115,6 +115,8 @@ target_link_libraries(catcheye_guard
         catcheye::vision_runtime
         catcheye::vision_transport
         ${OpenCV_LIBS}
+        lapack
+        blas
         ncnn
         spdlog::spdlog
     PRIVATE
