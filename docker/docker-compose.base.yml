@@ -1,5 +1,7 @@
 services:
   robot-base:
+    env_file:
+      - .env
     build:
       context: ..
       dockerfile: docker/Dockerfile
