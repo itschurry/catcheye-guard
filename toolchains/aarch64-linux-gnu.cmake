@@ -3,13 +3,11 @@ set(CMAKE_SYSTEM_PROCESSOR aarch64)
 
 find_program(AARCH64_GCC
     NAMES
-        aarch64-linux-gnu-gcc
         aarch64-linux-gnu-gcc-13
 )
 
 find_program(AARCH64_GXX
     NAMES
-        aarch64-linux-gnu-g++
         aarch64-linux-gnu-g++-13
 )
 
