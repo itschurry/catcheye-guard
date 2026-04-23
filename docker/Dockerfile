@@ -80,12 +80,21 @@ RUN set -eux; \
     libopenblas-pthread-dev:arm64 \
     libjpeg-dev:arm64 \
     libpng-dev:arm64 \
-    libtiff5-dev:arm64; \
+    libtiff5-dev:arm64 \
+    libgpiod-dev:arm64 \
+    gpiod:arm64; \
     cp /var/cache/apt/archives/*.deb /tmp/sysroot-debs/; \
     for pkg in /tmp/sysroot-debs/*_arm64.deb /tmp/sysroot-debs/*_all.deb; do \
     [ -e "${pkg}" ] || continue; \
     dpkg-deb -x "${pkg}" "${TARGET_SYSROOT}"; \
     done; \
+    if ls /var/cache/apt/archives/libgpiod-dev_*_arm64.deb >/dev/null 2>&1; then \
+    for pkg in /var/cache/apt/archives/libgpiod-dev_*_arm64.deb \
+               /var/cache/apt/archives/gpiod_*_arm64.deb; do \
+    [ -e "${pkg}" ] || continue; \
+    dpkg-deb -x "${pkg}" "${TARGET_SYSROOT}"; \
+    done; \
+    fi; \
     mkdir -p "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu"; \
     for lib in blas lapack openblas; do \
     for suffix in .so .so.3; do \

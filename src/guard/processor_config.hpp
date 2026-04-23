@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "catcheye/hardware/gpio_signal_config.hpp"
 #include "catcheye/roi/camera_roi_config.hpp"
 #include "guard/detector_factory.hpp"
 
@@ -18,6 +19,9 @@ struct GuardProcessorConfig {
     bool roi_enabled = false;
     std::string roi_config_path;
     catcheye::roi::CameraRoiConfig roi_config;
+
+    // ── GPIO signal ──────────────────────────────────────────
+    GpioSignalConfig roi_alert_gpio;
 };
 
 } // namespace catcheye

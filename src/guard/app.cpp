@@ -1,5 +1,6 @@
 #include "guard/app.hpp"
 
+#include <chrono>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -149,10 +150,22 @@ AppOptions parse_app_options(int argc, char** argv) {
         } else if (arg == "--http-port" && i + 1 < args.size()) {
             ++i;
             options.http_port = std::stoi(args[i]);
+        } else if (arg == "--roi-alert-gpio" && i + 1 < args.size()) {
+            ++i;
+            options.roi_alert_gpio = std::stoi(args[i]);
+        } else if (arg == "--roi-alert-pulse-ms" && i + 1 < args.size()) {
+            ++i;
+            options.roi_alert_pulse_ms = std::stoi(args[i]);
+        } else if (arg == "--gpio-chip" && i + 1 < args.size()) {
+            ++i;
+            options.gpio_chip_path = args[i];
+        } else if (arg == "--roi-alert-active-low") {
+            options.roi_alert_active_low = true;
         } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" ||
                    arg == "--camera-device" || arg == "--ws" ||
                    arg == "--camera-width" || arg == "--camera-height" || arg == "--num-threads" ||
-                   arg == "--http-port") {
+                   arg == "--http-port" || arg == "--roi-alert-gpio" || arg == "--roi-alert-pulse-ms" ||
+                   arg == "--gpio-chip") {
             throw std::runtime_error("missing value for flag: " + arg);
         } else if (is_input_mode(arg)) {
             throw std::runtime_error("input mode flags are mutually exclusive");
@@ -187,6 +200,12 @@ AppOptions parse_app_options(int argc, char** argv) {
     }
     if (options.http_port <= 0) {
         throw std::runtime_error("HTTP port must be a positive integer");
+    }
+    if (options.roi_alert_gpio < -1) {
+        throw std::runtime_error("ROI alert GPIO line must be -1 or a non-negative integer");
+    }
+    if (options.roi_alert_pulse_ms < 0) {
+        throw std::runtime_error("ROI alert pulse must be zero or a positive integer");
     }
 
     if ((options.input.camera_width % 2) != 0 || (options.input.camera_height % 2) != 0) {
@@ -247,6 +266,12 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     bootstrap.processor_config.roi_enabled = true;
     bootstrap.processor_config.roi_config_path = loaded_roi_config.path;
     bootstrap.processor_config.roi_config = loaded_roi_config.config;
+    bootstrap.processor_config.roi_alert_gpio.enabled = options.roi_alert_gpio >= 0;
+    bootstrap.processor_config.roi_alert_gpio.chip_path = options.gpio_chip_path;
+    bootstrap.processor_config.roi_alert_gpio.line = options.roi_alert_gpio;
+    bootstrap.processor_config.roi_alert_gpio.active_low = options.roi_alert_active_low;
+    bootstrap.processor_config.roi_alert_gpio.pulse_duration = std::chrono::milliseconds(options.roi_alert_pulse_ms);
+    bootstrap.processor_config.roi_alert_gpio.consumer = "catcheye-guard-roi-alert";
 
     bootstrap.runtime_config.process_every_n_frames = 2;
     bootstrap.publisher_type = options.publisher_type;
@@ -277,6 +302,13 @@ int run_app(int argc, char** argv) {
                   bootstrap.processor_config.roi_config_path,
                   publisher_name(bootstrap.publisher_type),
                   bootstrap.http_roi_server_config.port);
+        if (bootstrap.processor_config.roi_alert_gpio.enabled) {
+            log->info("ROI alert GPIO enabled: chip='{}', line={}, pulse_ms={}, active_low={}",
+                      bootstrap.processor_config.roi_alert_gpio.chip_path,
+                      bootstrap.processor_config.roi_alert_gpio.line,
+                      bootstrap.processor_config.roi_alert_gpio.pulse_duration.count(),
+                      bootstrap.processor_config.roi_alert_gpio.active_low);
+        }
     }
 
     std::unique_ptr<catcheye::transport::ResultPublisher> publisher;

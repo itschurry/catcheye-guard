@@ -159,7 +159,9 @@ bool build_annotated_publish_frame(const catcheye::input::Frame& source_frame,
 } // namespace
 
 GuardProcessor::GuardProcessor(GuardProcessorConfig config)
-    : config_(std::move(config)), detector_(create_detector(config_.detector))
+    : config_(std::move(config)),
+      detector_(create_detector(config_.detector)),
+      roi_alert_signal_(std::make_unique<catcheye::hardware::GpioPulseSignal>(config_.roi_alert_gpio))
 {
     if (const auto log = logger()) {
         log->info("GuardProcessor created with 'ncnn' backend");
@@ -192,6 +194,13 @@ bool GuardProcessor::initialize() {
     if (!detector_->initialize()) {
         if (const auto log = logger()) {
             log->error("failed to initialize detector");
+        }
+        return false;
+    }
+
+    if (!roi_alert_signal_->initialize()) {
+        if (const auto log = logger()) {
+            log->error("failed to initialize ROI alert GPIO signal");
         }
         return false;
     }
@@ -234,10 +243,12 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
         filter_detections(cached_detections_, config_.filter_by_class, config_.filter_class_id);
     const std::vector<EvaluatedDetection> evaluated_detections =
         evaluate_detections(visible_detections, roi.enabled, roi.config);
+    bool has_roi_violation = false;
 
     if (roi.enabled) {
         for (const EvaluatedDetection& ed : evaluated_detections) {
             if (ed.roi_result.status == RoiEvaluationStatus::Restricted) {
+                has_roi_violation = true;
                 if (const auto log = logger()) {
                     log->warn("ROI restricted: frame={}, class_id={}, score={:.2f}, reason={}", context.frame_index, ed.detection.class_id,
                               ed.detection.score, ed.roi_result.reason);
@@ -245,6 +256,18 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
             }
         }
     }
+
+    if (roi_violation_active_ != has_roi_violation) {
+        roi_alert_signal_->set_state(has_roi_violation);
+        if (const auto log = logger()) {
+            if (has_roi_violation) {
+                log->info("ROI alert GPIO ON at frame={}", context.frame_index);
+            } else {
+                log->info("ROI alert GPIO OFF at frame={}", context.frame_index);
+            }
+        }
+    }
+    roi_violation_active_ = has_roi_violation;
 
     catcheye::runtime::ProcessOutput output;
     if (!context.needs_publish) {

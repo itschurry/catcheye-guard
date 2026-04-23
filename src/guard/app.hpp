@@ -27,6 +27,10 @@ struct AppOptions {
     int websocket_port = 8080;
     int http_port = 8090;
     int num_threads = 2;
+    int roi_alert_gpio = 14;
+    int roi_alert_pulse_ms = 100;
+    bool roi_alert_active_low = false;
+    std::string gpio_chip_path = "/dev/gpiochip4";
     std::vector<std::string> positional_args;
 };
 

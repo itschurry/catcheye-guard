@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "catcheye/hardware/gpio_signal.hpp"
 #include "catcheye/roi/camera_roi_config.hpp"
 #include "catcheye/protocol/frame_message.hpp"
 #include "catcheye/runtime/frame_processor.hpp"
@@ -33,7 +34,9 @@ class GuardProcessor final : public catcheye::runtime::FrameProcessor {
     mutable std::mutex roi_mutex_;
     GuardProcessorConfig config_;
     std::unique_ptr<IDetector> detector_;
+    std::unique_ptr<catcheye::hardware::GpioPulseSignal> roi_alert_signal_;
     std::vector<Detection> cached_detections_;
+    bool roi_violation_active_ = false;
 };
 
 } // namespace catcheye
