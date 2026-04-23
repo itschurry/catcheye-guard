@@ -26,8 +26,6 @@ class GuardProcessor final : public catcheye::runtime::FrameProcessor {
     std::vector<Detection> cached_detections_;
     std::string last_seen_roi_config_text_;
     bool roi_reload_watch_warning_emitted_ = false;
-    bool roi_frame_size_warning_emitted_ = false;
-    int jpeg_quality_ = 80;
 };
 
 } // namespace catcheye

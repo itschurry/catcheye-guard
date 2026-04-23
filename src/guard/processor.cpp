@@ -6,10 +6,13 @@
 #include <utility>
 #include <vector>
 
+#include <opencv2/imgproc.hpp>
+
 #include "catcheye/protocol/frame_message.hpp"
 #include "catcheye/roi/roi_validation.hpp"
 #include "catcheye/utils/logger.hpp"
 #include "guard/detector_factory.hpp" // create_detector
+#include "guard/preview_renderer.hpp"
 #include "guard/roi_reload.hpp"
 
 namespace catcheye {
@@ -76,6 +79,83 @@ std::string build_metadata_json(const std::vector<EvaluatedDetection>& detection
 
     oss << "]}";
     return oss.str();
+}
+
+cv::Mat frame_to_bgr_mat(const catcheye::input::Frame& frame) {
+    if (frame.empty() || frame.width <= 0 || frame.height <= 0 || frame.stride <= 0) {
+        return {};
+    }
+
+    const std::size_t expected_size = catcheye::input::frame_data_size(frame.format, frame.stride, frame.height);
+    if (frame.data.size() < expected_size) {
+        return {};
+    }
+
+    auto* raw = const_cast<std::uint8_t*>(frame.data.data());
+    switch (frame.format) {
+    case catcheye::input::PixelFormat::BGR: {
+        cv::Mat wrapped(frame.height, frame.width, CV_8UC3, raw, static_cast<std::size_t>(frame.stride));
+        return wrapped.clone();
+    }
+    case catcheye::input::PixelFormat::RGB: {
+        cv::Mat wrapped(frame.height, frame.width, CV_8UC3, raw, static_cast<std::size_t>(frame.stride));
+        cv::Mat bgr;
+        cv::cvtColor(wrapped, bgr, cv::COLOR_RGB2BGR);
+        return bgr;
+    }
+    case catcheye::input::PixelFormat::RGBA: {
+        cv::Mat wrapped(frame.height, frame.width, CV_8UC4, raw, static_cast<std::size_t>(frame.stride));
+        cv::Mat bgr;
+        cv::cvtColor(wrapped, bgr, cv::COLOR_RGBA2BGR);
+        return bgr;
+    }
+    case catcheye::input::PixelFormat::BGRA: {
+        cv::Mat wrapped(frame.height, frame.width, CV_8UC4, raw, static_cast<std::size_t>(frame.stride));
+        cv::Mat bgr;
+        cv::cvtColor(wrapped, bgr, cv::COLOR_BGRA2BGR);
+        return bgr;
+    }
+    case catcheye::input::PixelFormat::GRAY8: {
+        cv::Mat wrapped(frame.height, frame.width, CV_8UC1, raw, static_cast<std::size_t>(frame.stride));
+        cv::Mat bgr;
+        cv::cvtColor(wrapped, bgr, cv::COLOR_GRAY2BGR);
+        return bgr;
+    }
+    case catcheye::input::PixelFormat::NV12: {
+        cv::Mat wrapped(frame.height + (frame.height / 2), frame.width, CV_8UC1, raw, static_cast<std::size_t>(frame.stride));
+        cv::Mat bgr;
+        cv::cvtColor(wrapped, bgr, cv::COLOR_YUV2BGR_NV12);
+        return bgr;
+    }
+    case catcheye::input::PixelFormat::UNKNOWN:
+        break;
+    }
+
+    return {};
+}
+
+bool build_annotated_publish_frame(const catcheye::input::Frame& source_frame,
+                                   const std::vector<EvaluatedDetection>& detections,
+                                   const IDetector& detector,
+                                   const GuardProcessorConfig& config,
+                                   catcheye::input::Frame& output_frame) {
+    cv::Mat bgr = frame_to_bgr_mat(source_frame);
+    if (bgr.empty()) {
+        return false;
+    }
+
+    if (config.roi_enabled) {
+        draw_roi_zones(bgr, config.roi_config);
+    }
+    draw_detections(bgr, detections, detector, config.roi_enabled);
+
+    output_frame.data.assign(bgr.datastart, bgr.dataend);
+    output_frame.width = bgr.cols;
+    output_frame.height = bgr.rows;
+    output_frame.stride = static_cast<int>(bgr.step);
+    output_frame.format = catcheye::input::PixelFormat::BGR;
+    output_frame.timestamp = source_frame.timestamp;
+    return true;
 }
 
 } // namespace
@@ -148,6 +228,10 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
     output.has_message = true;
     output.message.stream_name = "person-guard";
     output.message.metadata_json = build_metadata_json(evaluated_detections, *detector_, config_.roi_enabled);
+
+    if (build_annotated_publish_frame(frame, evaluated_detections, *detector_, config_, output.publish_frame)) {
+        output.has_publish_frame = true;
+    }
     return output;
 }
 
