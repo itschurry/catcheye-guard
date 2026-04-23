@@ -61,7 +61,9 @@ sudo apt install -y \
   gstreamer1.0-plugins-good \
   gstreamer1.0-plugins-ugly \
   libgstrtspserver-1.0-0 \
-  gstreamer1.0-tools
+  gstreamer1.0-tools \
+  libgpiod-dev \
+  gpiod
 ```
 
 설치 확인:
@@ -91,6 +93,18 @@ docker compose -f docker/docker-compose.dev.yml run --rm catcheye-guard-dev bash
 - target sysroot: `/opt/sysroots/raspi`
 - `ncnn`: `/opt/sysroots/raspi/usr`
 - `libcamera`: `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu`
+
+GPIO 신호를 쓰려면 빌드 타임에 `libgpiod`가 반드시 필요하다.
+`libgpiod` 누락 상태면 설정 단계에서 아래처럼 멈춘다.
+
+```bash
+cmake -S /home/user/catcheye-guard -B /home/user/catcheye-guard/build/aarch64 -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_TOOLCHAIN_FILE=/home/user/catcheye-guard/toolchains/aarch64-linux-gnu.cmake \
+  -DTARGET_SYSROOT=/opt/sysroots/raspi
+```
+
+핵심: 호스트와 `${TARGET_SYSROOT}` 둘 다 `libgpiod-dev`, `gpiod`가 있어야 한다.
 
 설치 결과 확인:
 
@@ -171,6 +185,10 @@ cd /opt/catcheye-guard
 - `--rtsp [port]`: RTSP 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
 - `--ws [port]`: WebSocket 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
 - `--num-threads <n>`: NCNN 추론 스레드 수를 지정한다.
+- `--roi-alert-gpio <line>`: ROI 이탈이 처음 감지될 때 pulse를 보낼 GPIO line 번호를 지정한다. 비활성화하려면 생략하거나 `-1`을 쓴다.
+- `--roi-alert-pulse-ms <ms>`: ROI 알림 GPIO pulse 길이를 밀리초 단위로 지정한다.
+- `--roi-alert-active-low`: active-low 출력으로 GPIO를 요청한다.
+- `--gpio-chip <path>`: 기본 GPIO 칩 경로(`/dev/gpiochip0`)를 덮어쓴다.
 
 위치 인자:
 
@@ -188,6 +206,8 @@ cd /opt/catcheye-guard
 - `--camera-width`, `--camera-height` 는 `--camera` 와 함께만 사용할 수 있다.
 - `--camera-pipeline` 사용 시 `--camera-width`, `--camera-height` 는 지원하지 않는다.
 - `--camera-width`, `--camera-height` 는 짝수 양수여야 한다.
+- `--roi-alert-gpio` 는 `-1` 또는 0 이상의 GPIO line 번호여야 한다.
+- `--roi-alert-pulse-ms` 는 0 이상의 값이어야 한다.
 - `--headless` 는 더 이상 지원하지 않는다.
 - `--rtsp-with-preview` 는 더 이상 지원하지 않는다.
 - `--ws-with-preview` 는 더 이상 지원하지 않는다.
@@ -258,6 +278,12 @@ USB 카메라 + `gstreamer` 소스 + WebSocket 송출:
 
 ```bash
 ./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --ws 8080
+```
+
+ROI 이탈 시 GPIO18로 100ms pulse 출력:
+
+```bash
+./bin/catcheye-guard --camera --roi-alert-gpio 18 --roi-alert-pulse-ms 100
 ```
 
 이미지 파일 입력:

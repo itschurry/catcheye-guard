@@ -71,6 +71,16 @@ find_package(yaml-cpp REQUIRED)
 message(STATUS "yaml-cpp version: ${yaml-cpp_VERSION}")
 
 find_package(spdlog REQUIRED)
+find_library(GPIOD_LIBRARY gpiod)
+find_path(GPIOD_INCLUDE_DIR gpiod.h)
+if (GPIOD_LIBRARY AND GPIOD_INCLUDE_DIR)
+    message(STATUS "libgpiod found: ${GPIOD_LIBRARY}")
+else()
+    message(FATAL_ERROR
+        "libgpiod not found. Install libgpiod-dev/gpiod in the build environment and target sysroot "
+        "(for cross build):\n"
+        "  sudo apt install libgpiod-dev gpiod")
+endif()
 
 # ---------------------------------------------------------------------------
 # Source collection
@@ -100,6 +110,10 @@ target_include_directories(catcheye_guard
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+if(GPIOD_INCLUDE_DIR)
+    target_include_directories(catcheye_guard PRIVATE ${GPIOD_INCLUDE_DIR})
+endif()
+
 target_compile_features(catcheye_guard PUBLIC cxx_std_20)
 
 target_compile_definitions(catcheye_guard
@@ -122,6 +136,12 @@ target_link_libraries(catcheye_guard
     PRIVATE
         yaml-cpp::yaml-cpp
 )
+
+if(GPIOD_LIBRARY)
+    target_link_libraries(catcheye_guard PUBLIC ${GPIOD_LIBRARY})
+endif()
+
+target_compile_definitions(catcheye_guard PUBLIC CATCHEYE_HAS_LIBGPIOD=1)
 
 set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
