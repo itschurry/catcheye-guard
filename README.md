@@ -38,6 +38,7 @@ cd /opt/catcheye-guard
 - Raspberry Pi에는 `libcamera`와 카메라/미디어 런타임이 로컬에 준비되어 있어야 한다.
 
 사용 중인 툴체인 파일:
+
 - [`toolchains/aarch64-linux-gnu.cmake`](/home/user/catcheye-guard/toolchains/aarch64-linux-gnu.cmake)
 
 ## ARM 장비 준비
@@ -58,6 +59,7 @@ sudo apt install -y \
   gstreamer1.0-plugins-bad \
   gstreamer1.0-plugins-base \
   gstreamer1.0-plugins-good \
+  gstreamer1.0-plugins-ugly \
   libgstrtspserver-1.0-0 \
   gstreamer1.0-tools
 ```
