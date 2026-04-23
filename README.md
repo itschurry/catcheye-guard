@@ -203,8 +203,8 @@ WebSocket 송출 형식:
 
 - 클라이언트는 `ws://<host>:<port>/` 로 접속한다.
 - 프레임마다 텍스트 프레임 1개와 바이너리 프레임 1개를 순서대로 받는다.
-- 텍스트 프레임에는 `frame_index`, `stream_name`, `width`, `height`, `stride`, `pixel_format`, `timestamp`, `payload_size`, `metadata` 가 JSON으로 담긴다.
-- 바이너리 프레임에는 원본 `Frame::data` 바이트가 그대로 담긴다.
+- 텍스트 프레임에는 `frame_index`, `stream_name`, `width`, `height`, `stride`, `pixel_format`, `timestamp`, `payload_encoding`, `payload_size`, `metadata` 가 JSON으로 담긴다.
+- 바이너리 프레임에는 JPEG 인코딩된 이미지 바이트가 담긴다.
 
 ## 권장 실행 예시
 
