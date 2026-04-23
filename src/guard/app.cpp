@@ -14,6 +14,7 @@
 #include "catcheye/runtime/frame_processing_runner.hpp"
 #include "catcheye/transport/rtsp_publisher.hpp"
 #include "catcheye/utils/logger.hpp"
+#include "guard/http_roi_server.hpp"
 #include "guard/processor.hpp"
 
 namespace catcheye::guard {
@@ -145,9 +146,13 @@ AppOptions parse_app_options(int argc, char** argv) {
         } else if (arg == "--num-threads" && i + 1 < args.size()) {
             ++i;
             options.num_threads = std::stoi(args[i]);
+        } else if (arg == "--http-port" && i + 1 < args.size()) {
+            ++i;
+            options.http_port = std::stoi(args[i]);
         } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" ||
                    arg == "--camera-device" || arg == "--ws" ||
-                   arg == "--camera-width" || arg == "--camera-height" || arg == "--num-threads") {
+                   arg == "--camera-width" || arg == "--camera-height" || arg == "--num-threads" ||
+                   arg == "--http-port") {
             throw std::runtime_error("missing value for flag: " + arg);
         } else if (is_input_mode(arg)) {
             throw std::runtime_error("input mode flags are mutually exclusive");
@@ -179,6 +184,9 @@ AppOptions parse_app_options(int argc, char** argv) {
 
     if (options.input.camera_width <= 0 || options.input.camera_height <= 0) {
         throw std::runtime_error("camera dimensions must be positive integers");
+    }
+    if (options.http_port <= 0) {
+        throw std::runtime_error("HTTP port must be a positive integer");
     }
 
     if ((options.input.camera_width % 2) != 0 || (options.input.camera_height % 2) != 0) {
@@ -237,7 +245,6 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
 
     // ── ROI / runtime 설정 (기존과 동일) ─────────────────────
     bootstrap.processor_config.roi_enabled = true;
-    bootstrap.processor_config.roi_auto_reload = options.input.type == catcheye::input::InputSourceType::Camera;
     bootstrap.processor_config.roi_config_path = loaded_roi_config.path;
     bootstrap.processor_config.roi_config = loaded_roi_config.config;
 
@@ -247,6 +254,7 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     bootstrap.rtsp_publisher_config.width = options.input.camera_width;
     bootstrap.rtsp_publisher_config.height = options.input.camera_height;
     bootstrap.websocket_publisher_config.port = options.websocket_port;
+    bootstrap.http_roi_server_config.port = options.http_port;
 
     if (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty()) {
         throw std::runtime_error("NCNN model paths are required");
@@ -264,10 +272,11 @@ int run_app(int argc, char** argv) {
     AppBootstrap bootstrap = build_app_bootstrap(options, default_paths, loaded_roi_config);
 
     if (const auto log = logger()) {
-        log->info("catcheye-guard starting (mode='{}', ROI='{}', publisher='{}')",
+        log->info("catcheye-guard starting (mode='{}', ROI='{}', publisher='{}', http_port={})",
                   describe_runtime_mode(options),
                   bootstrap.processor_config.roi_config_path,
-                  publisher_name(bootstrap.publisher_type));
+                  publisher_name(bootstrap.publisher_type),
+                  bootstrap.http_roi_server_config.port);
     }
 
     std::unique_ptr<catcheye::transport::ResultPublisher> publisher;
@@ -277,10 +286,22 @@ int run_app(int argc, char** argv) {
         publisher = std::make_unique<catcheye::transport::WebSocketPublisher>(bootstrap.websocket_publisher_config);
     }
 
+    const std::string http_roi_config_path = bootstrap.processor_config.roi_config_path;
     auto processor = std::make_unique<catcheye::GuardProcessor>(std::move(bootstrap.processor_config));
+    auto* processor_ptr = processor.get();
+    HttpRoiServer roi_server(
+        bootstrap.http_roi_server_config,
+        http_roi_config_path,
+        processor_ptr);
+    if (!roi_server.start()) {
+        throw std::runtime_error("failed to start ROI HTTP API server");
+    }
+
     catcheye::runtime::FrameProcessingRunner runner(std::move(bootstrap.runtime_config), std::move(bootstrap.source), std::move(processor),
                                                     std::move(publisher));
-    return runner.run();
+    const int exit_code = runner.run();
+    roi_server.stop();
+    return exit_code;
 }
 
 } // namespace catcheye::guard

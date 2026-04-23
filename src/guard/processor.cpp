@@ -13,13 +13,11 @@
 #include "catcheye/utils/logger.hpp"
 #include "guard/detector_factory.hpp" // create_detector
 #include "guard/preview_renderer.hpp"
-#include "guard/roi_reload.hpp"
 
 namespace catcheye {
 namespace {
 
 using RoiEvaluationStatus = catcheye::roi::EvaluationStatus;
-constexpr std::uint64_t ROI_RELOAD_INTERVAL_FRAMES = 15;
 
 std::string roi_status_to_string(RoiEvaluationStatus status) {
     switch (status) {
@@ -168,9 +166,18 @@ GuardProcessor::GuardProcessor(GuardProcessorConfig config)
     }
 }
 
+GuardProcessor::RoiSnapshot GuardProcessor::roi_snapshot() const {
+    std::lock_guard<std::mutex> lock(roi_mutex_);
+    return {
+        .enabled = config_.roi_enabled,
+        .config = config_.roi_config,
+    };
+}
+
 bool GuardProcessor::initialize() {
-    if (config_.roi_enabled) {
-        const auto validation = catcheye::roi::validate_camera_roi_config(config_.roi_config);
+    const RoiSnapshot roi = roi_snapshot();
+    if (roi.enabled) {
+        const auto validation = catcheye::roi::validate_camera_roi_config(roi.config);
         if (!validation.valid) {
             if (const auto log = logger()) {
                 log->error("ROI config invalid: {} issue(s)", validation.issues.size());
@@ -182,8 +189,6 @@ bool GuardProcessor::initialize() {
         }
     }
 
-    initialize_roi_reload_watch(config_, last_seen_roi_config_text_, roi_reload_watch_warning_emitted_);
-
     if (!detector_->initialize()) {
         if (const auto log = logger()) {
             log->error("failed to initialize detector");
@@ -194,22 +199,43 @@ bool GuardProcessor::initialize() {
     return true;
 }
 
-catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::Frame& frame,
-                                                         const catcheye::runtime::ProcessContext& context) {
-    if (context.frame_index % ROI_RELOAD_INTERVAL_FRAMES == 0U) {
-        try_reload_roi_config(config_, last_seen_roi_config_text_, roi_reload_watch_warning_emitted_);
+bool GuardProcessor::update_roi_config(const catcheye::roi::CameraRoiConfig& roi_config) {
+    const auto validation = catcheye::roi::validate_camera_roi_config(roi_config);
+    if (!validation.valid) {
+        if (const auto log = logger()) {
+            log->warn("refusing invalid ROI config update: {} issue(s)", validation.issues.size());
+        }
+        return false;
     }
 
+    {
+        std::lock_guard<std::mutex> lock(roi_mutex_);
+        config_.roi_enabled = true;
+        config_.roi_config = roi_config;
+    }
+
+    if (const auto log = logger()) {
+        log->info(
+            "ROI config updated in memory: camera_id='{}', zones={}",
+            roi_config.camera_id,
+            roi_config.allowed_zones.size());
+    }
+    return true;
+}
+
+catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::Frame& frame,
+                                                         const catcheye::runtime::ProcessContext& context) {
     if (context.should_process) {
         cached_detections_ = detector_->detect(frame);
     }
 
+    const RoiSnapshot roi = roi_snapshot();
     const std::vector<Detection> visible_detections =
         filter_detections(cached_detections_, config_.filter_by_class, config_.filter_class_id);
     const std::vector<EvaluatedDetection> evaluated_detections =
-        evaluate_detections(visible_detections, config_.roi_enabled, config_.roi_config);
+        evaluate_detections(visible_detections, roi.enabled, roi.config);
 
-    if (config_.roi_enabled) {
+    if (roi.enabled) {
         for (const EvaluatedDetection& ed : evaluated_detections) {
             if (ed.roi_result.status == RoiEvaluationStatus::Restricted) {
                 if (const auto log = logger()) {
@@ -227,9 +253,12 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
 
     output.has_message = true;
     output.message.stream_name = "person-guard";
-    output.message.metadata_json = build_metadata_json(evaluated_detections, *detector_, config_.roi_enabled);
+    output.message.metadata_json = build_metadata_json(evaluated_detections, *detector_, roi.enabled);
 
-    if (build_annotated_publish_frame(frame, evaluated_detections, *detector_, config_, output.publish_frame)) {
+    GuardProcessorConfig publish_config;
+    publish_config.roi_enabled = roi.enabled;
+    publish_config.roi_config = roi.config;
+    if (build_annotated_publish_frame(frame, evaluated_detections, *detector_, publish_config, output.publish_frame)) {
         output.has_publish_frame = true;
     }
     return output;

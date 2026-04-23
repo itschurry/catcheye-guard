@@ -16,7 +16,6 @@ struct GuardProcessorConfig {
 
     // ── ROI ──────────────────────────────────────────────────
     bool roi_enabled = false;
-    bool roi_auto_reload = true;
     std::string roi_config_path;
     catcheye::roi::CameraRoiConfig roi_config;
 };
