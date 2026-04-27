@@ -45,6 +45,7 @@ set(ncnn_DIR      "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/ncnn"     C
 set(yaml-cpp_DIR  "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/yaml-cpp" CACHE PATH "yaml-cpp CMake package directory" FORCE)
 set(spdlog_DIR    "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/spdlog"   CACHE PATH "spdlog CMake package directory"   FORCE)
 set(fmt_DIR       "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/cmake/fmt"      CACHE PATH "fmt CMake package directory"      FORCE)
+set(HailoRT_DIR   "${TARGET_SYSROOT}/usr/lib/cmake/HailoRT"                   CACHE PATH "HailoRT CMake package directory"   FORCE)
 
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)

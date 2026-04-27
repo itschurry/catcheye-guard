@@ -31,6 +31,9 @@ struct AppOptions {
     int roi_alert_pulse_ms = 100;
     bool roi_alert_active_low = false;
     std::string gpio_chip_path = "/dev/gpiochip4";
+    catcheye::DetectorBackend detector_backend = catcheye::DetectorBackend::Ncnn;
+    std::string hef_path;
+    std::string metadata_path;
     std::vector<std::string> positional_args;
 };
 
@@ -38,6 +41,7 @@ struct DefaultPaths {
     std::string param_path;
     std::string bin_path;
     std::string metadata_path;
+    std::string hef_path;
     std::string roi_config_path;
 };
 

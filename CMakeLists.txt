@@ -313,9 +313,11 @@ if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}/usr/lib")
         PATTERN "libncnn*.so"
         PATTERN "libncnn*.so.*"
         PATTERN "libncnn*.a"
+        PATTERN "libhailort*.so"
+        PATTERN "libhailort*.so.*"
     )
 else()
-    message(WARNING "TARGET_SYSROOT/usr/lib not found; ncnn libraries will not be copied into the install tree")
+    message(WARNING "TARGET_SYSROOT/usr/lib not found; ncnn/HailoRT libraries will not be copied into the install tree")
 endif()
 
 if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu")

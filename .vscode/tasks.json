@@ -21,7 +21,7 @@
       "command": "bash",
       "args": [
         "-c",
-        "cmake -S . -B build/release -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchains/aarch64-linux-gnu.cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DTARGET_SYSROOT=/opt/sysroots/raspi"
+        "cmake -S . -B build/release -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchains/aarch64-linux-gnu.cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DTARGET_SYSROOT=/opt/sysroots/raspi -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON"
       ],
       "problemMatcher": [],
       "group": {

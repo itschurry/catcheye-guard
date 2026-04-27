@@ -72,6 +72,103 @@ sudo apt install -y \
 gst-inspect-1.0 libcamerasrc
 ```
 
+### libcamera 설치
+
+기본은 배포판 패키지를 먼저 쓴다.
+
+```bash
+sudo apt update
+sudo apt install -y \
+  libcamera0.4 \
+  libcamera-tools \
+  gstreamer1.0-libcamera
+```
+
+설치 확인:
+
+```bash
+cam --list
+gst-inspect-1.0 libcamerasrc
+```
+
+Raspberry Pi 카메라가 패키지 버전과 맞지 않으면 `raspberrypi/libcamera`를 직접 빌드한다.
+Docker 이미지는 아래와 같은 옵션으로 같은 저장소를 크로스빌드해서 sysroot에 넣는다.
+
+ARM 장비에서 직접 빌드할 때:
+
+```bash
+sudo apt update
+sudo apt install -y \
+  git meson ninja-build pkg-config \
+  g++ python3-yaml python3-ply python3-jinja2 python3-pyelftools \
+  libgnutls28-dev openssl libtiff5-dev libevent-dev \
+  libdrm-dev libexif-dev libjpeg-dev libpng-dev \
+  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+
+git clone --depth 1 https://github.com/raspberrypi/libcamera.git
+meson setup libcamera/build libcamera \
+  --buildtype=release \
+  --prefix /usr \
+  --libdir lib/aarch64-linux-gnu \
+  -Dpipelines=rpi/vc4,rpi/pisp \
+  -Dipas=rpi/vc4,rpi/pisp \
+  -Dv4l2=enabled \
+  -Dgstreamer=enabled \
+  -Dtest=false \
+  -Dlc-compliance=disabled \
+  -Dcam=enabled \
+  -Dqcam=disabled \
+  -Ddocumentation=disabled \
+  -Dpycamera=disabled
+
+ninja -C libcamera/build -j$(nproc)
+sudo meson install -C libcamera/build
+sudo ldconfig
+```
+
+설치 후 확인:
+
+```bash
+cam --list
+gst-inspect-1.0 libcamerasrc
+ls /usr/lib/aarch64-linux-gnu/libcamera.so*
+ls /usr/share/libcamera
+```
+
+### Hailo PCIe 드라이버
+
+Hailo 백엔드를 쓰려면 Raspberry Pi에서 Hailo-8/8L PCIe 드라이버가 먼저 잡혀야 한다.
+컨테이너/sysroot에 넣는 `hailort_*.deb` 는 빌드용이고, 실제 장비 드라이버 설치를 대신하지 않는다.
+
+커널 헤더와 DKMS 준비:
+
+```bash
+sudo apt install -y linux-image-raspi linux-headers-raspi
+sudo reboot
+```
+
+재부팅 후 드라이버 빌드 도구 설치:
+
+```bash
+sudo apt install -y dkms build-essential
+```
+
+Hailo PCIe 드라이버 패키지 설치:
+
+```bash
+sudo dpkg -i ~/Downloads/hailort-pcie-driver_5.3.0_all.deb
+```
+
+설치 확인:
+
+```bash
+lsmod | grep hailo
+lspci | grep -i hailo
+hailortcli fw-control identify
+```
+
+`hailortcli fw-control identify` 에서 Hailo 장치 정보가 안 나오면 앱 문제가 아니라 드라이버, PCIe, 전원, 커널 헤더 쪽부터 다시 봐야 한다.
+
 참고:
 
 - 이 프로젝트는 Docker 이미지 빌드 시 `raspberrypi/libcamera`를 소스 크로스빌드해 `${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu` 아래에 설치한다.
@@ -184,6 +281,9 @@ cd /opt/catcheye-guard
 
 - `--rtsp [port]`: RTSP 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
 - `--ws [port]`: WebSocket 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
+- `--detector <ncnn|hailo>`: detector 백엔드를 선택한다. 기본값은 `ncnn` 이다.
+- `--hef <path>`: Hailo 백엔드에서 사용할 HEF 모델 경로를 지정한다.
+- `--metadata <path>`: 클래스 이름 메타데이터 YAML 경로를 지정한다.
 - `--num-threads <n>`: NCNN 추론 스레드 수를 지정한다.
 - `--roi-alert-gpio <line>`: ROI 이탈이 처음 감지될 때 pulse를 보낼 GPIO line 번호를 지정한다. 비활성화하려면 생략하거나 `-1`을 쓴다.
 - `--roi-alert-pulse-ms <ms>`: ROI 알림 GPIO pulse 길이를 밀리초 단위로 지정한다.
@@ -208,6 +308,8 @@ cd /opt/catcheye-guard
 - `--camera-width`, `--camera-height` 는 짝수 양수여야 한다.
 - `--roi-alert-gpio` 는 `-1` 또는 0 이상의 GPIO line 번호여야 한다.
 - `--roi-alert-pulse-ms` 는 0 이상의 값이어야 한다.
+- Hailo 백엔드는 빌드 시 `-DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON` 이 필요하다.
+- Hailo 백엔드를 실행하려면 Raspberry Pi에 HailoRT와 PCIe 드라이버가 설치되어 있어야 한다.
 - `--headless` 는 더 이상 지원하지 않는다.
 - `--rtsp-with-preview` 는 더 이상 지원하지 않는다.
 - `--ws-with-preview` 는 더 이상 지원하지 않는다.
@@ -233,7 +335,7 @@ WebSocket 송출 형식:
 권장 CSI GStreamer 입력 파이프라인:
 
 ```bash
-libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip video-direction=vert
+libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert
 ```
 
 참고:
@@ -259,7 +361,13 @@ CSI 카메라 + `gstreamer` 소스 + RTSP 송출:
 CSI 카메라 + `gstreamer` 소스 + WebSocket 송출:
 
 ```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip video-direction=vert" --ws 8080
+./install/release/./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector ncnn
+```
+
+CSI 카메라 + `gstreamer` 소스 + WebSocket 송출 + Hailo 백엔드:
+
+```bash
+./install/release/./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
 ```
 
 USB 카메라 + `gstreamer` 소스:
@@ -328,6 +436,12 @@ ROI 이탈 시 GPIO18로 100ms pulse 출력:
 ./bin/catcheye-guard --image ./frame.jpg ./models/model.ncnn.param ./models/model.ncnn.bin ./models/metadata.yaml ./models/roi_cam_default.json
 ```
 
+Hailo HEF 모델을 쓰는 예시:
+
+```bash
+./install/release/./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
+```
+
 ## 문제 생기면 확인
 
 `Could not find OpenCVConfig.cmake`
@@ -338,6 +452,13 @@ ROI 이탈 시 GPIO18로 100ms pulse 출력:
 `Could not find ncnn`
 
 - `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/cmake/ncnn/ncnnConfig.cmake`
+
+`Could not find HailoRT`
+
+- HailoRT SDK/런타임 설치 상태를 확인한다.
+- `hailort_*.deb` 를 sysroot에 추출했는지 확인한다.
+- 이 패키지는 CMake config를 보통 `/usr/lib/cmake/HailoRT` 아래에 둔다.
+- CMake가 못 찾으면 `-DHailoRT_DIR=/opt/sysroots/raspi/usr/lib/cmake/HailoRT` 를 넘긴다.
 
 `pkg-config`로 `libcamera` / `gstreamer`를 못 찾음
 

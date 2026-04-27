@@ -164,7 +164,7 @@ GuardProcessor::GuardProcessor(GuardProcessorConfig config)
       roi_alert_signal_(std::make_unique<catcheye::hardware::GpioPulseSignal>(config_.roi_alert_gpio))
 {
     if (const auto log = logger()) {
-        log->info("GuardProcessor created with 'ncnn' backend");
+        log->info("GuardProcessor created");
     }
 }
 

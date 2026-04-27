@@ -59,6 +59,26 @@ bool is_input_mode(const std::string& arg) {
     return arg == "--image" || arg == "--video" || arg == "--camera";
 }
 
+catcheye::DetectorBackend parse_detector_backend(const std::string& value) {
+    if (value == "ncnn") {
+        return catcheye::DetectorBackend::Ncnn;
+    }
+    if (value == "hailo") {
+        return catcheye::DetectorBackend::Hailo;
+    }
+    throw std::runtime_error("unsupported detector backend: " + value);
+}
+
+const char* detector_backend_name(catcheye::DetectorBackend backend) {
+    switch (backend) {
+    case catcheye::DetectorBackend::Ncnn:
+        return "ncnn";
+    case catcheye::DetectorBackend::Hailo:
+        return "hailo";
+    }
+    return "unknown";
+}
+
 std::string describe_runtime_mode(const AppOptions& options)
 {
     const bool rtsp_enabled = options.publisher_type == PublisherType::Rtsp;
@@ -161,11 +181,17 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.gpio_chip_path = args[i];
         } else if (arg == "--roi-alert-active-low") {
             options.roi_alert_active_low = true;
+        } else if (arg == "--detector" && i + 1 < args.size()) {
+            options.detector_backend = parse_detector_backend(args[++i]);
+        } else if (arg == "--hef" && i + 1 < args.size()) {
+            options.hef_path = args[++i];
+        } else if (arg == "--metadata" && i + 1 < args.size()) {
+            options.metadata_path = args[++i];
         } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" ||
                    arg == "--camera-device" || arg == "--ws" ||
                    arg == "--camera-width" || arg == "--camera-height" || arg == "--num-threads" ||
                    arg == "--http-port" || arg == "--roi-alert-gpio" || arg == "--roi-alert-pulse-ms" ||
-                   arg == "--gpio-chip") {
+                   arg == "--gpio-chip" || arg == "--detector" || arg == "--hef" || arg == "--metadata") {
             throw std::runtime_error("missing value for flag: " + arg);
         } else if (is_input_mode(arg)) {
             throw std::runtime_error("input mode flags are mutually exclusive");
@@ -226,6 +252,7 @@ DefaultPaths resolve_default_paths(const char* executable_path) {
         .param_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/model.ncnn.param"),
         .bin_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/model.ncnn.bin"),
         .metadata_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/metadata.yaml"),
+        .hef_path = {},
         .roi_config_path = resolve_default_model_path(executable_path, "roi_cam_default.json"),
     };
 }
@@ -250,17 +277,22 @@ LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path)
 AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& default_paths, const LoadedRoiConfig& loaded_roi_config) {
     AppBootstrap bootstrap;
 
-    // ── NCNN 백엔드 설정 ──────────────────────────────────────
+    bootstrap.processor_config.detector.backend = options.detector_backend;
+
     auto& ncnn_cfg = bootstrap.processor_config.detector.ncnn;
     ncnn_cfg.param_path = default_paths.param_path;
     ncnn_cfg.bin_path = default_paths.bin_path;
-    ncnn_cfg.metadata_path = default_paths.metadata_path;
+    ncnn_cfg.metadata_path = options.metadata_path.empty() ? default_paths.metadata_path : options.metadata_path;
     ncnn_cfg.num_threads = options.num_threads;
 
     // positional args override (기존 동작 유지)
     if (!options.positional_args.empty()) ncnn_cfg.param_path = options.positional_args[0];
     if (options.positional_args.size() > 1) ncnn_cfg.bin_path = options.positional_args[1];
-    if (options.positional_args.size() > 2) ncnn_cfg.metadata_path = options.positional_args[2];
+    if (options.positional_args.size() > 2 && options.metadata_path.empty()) ncnn_cfg.metadata_path = options.positional_args[2];
+
+    auto& hailo_cfg = bootstrap.processor_config.detector.hailo;
+    hailo_cfg.hef_path = options.hef_path.empty() ? default_paths.hef_path : options.hef_path;
+    hailo_cfg.metadata_path = options.metadata_path.empty() ? default_paths.metadata_path : options.metadata_path;
 
     // ── ROI / runtime 설정 (기존과 동일) ─────────────────────
     bootstrap.processor_config.roi_enabled = true;
@@ -281,8 +313,11 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     bootstrap.websocket_publisher_config.port = options.websocket_port;
     bootstrap.http_roi_server_config.port = options.http_port;
 
-    if (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty()) {
+    if (options.detector_backend == catcheye::DetectorBackend::Ncnn && (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty())) {
         throw std::runtime_error("NCNN model paths are required");
+    }
+    if (options.detector_backend == catcheye::DetectorBackend::Hailo && hailo_cfg.hef_path.empty()) {
+        throw std::runtime_error("Hailo HEF path is required; pass --hef <model.hef>");
     }
 
     bootstrap.source = catcheye::input::create_frame_source(options.input);
@@ -302,6 +337,7 @@ int run_app(int argc, char** argv) {
                   bootstrap.processor_config.roi_config_path,
                   publisher_name(bootstrap.publisher_type),
                   bootstrap.http_roi_server_config.port);
+        log->info("detector backend: {}", detector_backend_name(bootstrap.processor_config.detector.backend));
         if (bootstrap.processor_config.roi_alert_gpio.enabled) {
             log->info("ROI alert GPIO enabled: chip='{}', line={}, pulse_ms={}, active_low={}",
                       bootstrap.processor_config.roi_alert_gpio.chip_path,
