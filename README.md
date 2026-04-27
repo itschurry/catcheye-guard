@@ -135,6 +135,13 @@ ls /usr/lib/aarch64-linux-gnu/libcamera.so*
 ls /usr/share/libcamera
 ```
 
+`raspberrypi/libcamera`를 `/usr/local` 기준으로 설치한 장비라면 GStreamer가 `libcamerasrc` 플러그인을 찾도록 아래 경로가 필요하다.
+배포용 `catcheye-guard` 런처는 이 값을 자동으로 잡는다.
+
+```bash
+export GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/gstreamer-1.0:$GST_PLUGIN_PATH
+```
+
 ### Hailo PCIe 드라이버
 
 Hailo 백엔드를 쓰려면 Raspberry Pi에서 Hailo-8/8L PCIe 드라이버가 먼저 잡혀야 한다.

@@ -60,7 +60,7 @@ add_subdirectory(
     "${CMAKE_CURRENT_BINARY_DIR}/catcheye-vision-sdk"
 )
 
-find_package(OpenCV REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc dnn imgcodecs)
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
 
 message(STATUS "target sysroot: ${TARGET_SYSROOT}")
@@ -333,9 +333,54 @@ if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gn
         PATTERN "libspdlog*.so.*"
         PATTERN "libfmt*.so"
         PATTERN "libfmt*.so.*"
+        PATTERN "libtbb*.so"
+        PATTERN "libtbb*.so.*"
+        PATTERN "libgomp*.so"
+        PATTERN "libgomp*.so.*"
+        PATTERN "libjpeg*.so"
+        PATTERN "libjpeg*.so.*"
+        PATTERN "libwebp*.so"
+        PATTERN "libwebp*.so.*"
+        PATTERN "libpng*.so"
+        PATTERN "libpng*.so.*"
+        PATTERN "libgdcm*.so"
+        PATTERN "libgdcm*.so.*"
+        PATTERN "libcharls*.so"
+        PATTERN "libcharls*.so.*"
+        PATTERN "libtiff*.so"
+        PATTERN "libtiff*.so.*"
+        PATTERN "libopenjp2*.so"
+        PATTERN "libopenjp2*.so.*"
+        PATTERN "libOpenEXR*.so"
+        PATTERN "libOpenEXR*.so.*"
+        PATTERN "libIex*.so"
+        PATTERN "libIex*.so.*"
+        PATTERN "libIlmThread*.so"
+        PATTERN "libIlmThread*.so.*"
+        PATTERN "libImath*.so"
+        PATTERN "libImath*.so.*"
+        PATTERN "libLerc*.so"
+        PATTERN "libLerc*.so.*"
+        PATTERN "libjbig*.so"
+        PATTERN "libjbig*.so.*"
+        PATTERN "libdeflate*.so"
+        PATTERN "libdeflate*.so.*"
+        PATTERN "libgdal*.so"
+        PATTERN "libgdal*.so.*"
     )
 else()
     message(WARNING "TARGET_SYSROOT runtime libraries not found; bundled third-party runtime libs will be incomplete")
+endif()
+
+if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}" AND CMAKE_READELF)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/install-runtime-closure.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/install-runtime-closure.cmake"
+        @ONLY
+    )
+    install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/install-runtime-closure.cmake")
+else()
+    message(WARNING "Runtime dependency closure copy is disabled because TARGET_SYSROOT or CMAKE_READELF is missing")
 endif()
 
 install(EXPORT catcheye_guard_targets

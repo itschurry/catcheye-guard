@@ -7,5 +7,6 @@ LIB_DIR="${APP_ROOT}/lib"
 LIBCAMERA_BIN="${SCRIPT_DIR}/catcheye-guard-bin"
 
 export LD_LIBRARY_PATH="${LIB_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export GST_PLUGIN_PATH="/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/gstreamer-1.0${GST_PLUGIN_PATH:+:${GST_PLUGIN_PATH}}"
 
 exec "${LIBCAMERA_BIN}" "$@"
