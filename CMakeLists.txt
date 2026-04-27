@@ -63,12 +63,7 @@ add_subdirectory(
 find_package(OpenCV REQUIRED)
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
 
-find_package(ncnn REQUIRED)
-message(STATUS "ncnn version: ${ncnn_VERSION}")
 message(STATUS "target sysroot: ${TARGET_SYSROOT}")
-
-find_package(yaml-cpp REQUIRED)
-message(STATUS "yaml-cpp version: ${yaml-cpp_VERSION}")
 
 find_package(spdlog REQUIRED)
 find_library(GPIOD_LIBRARY gpiod)
@@ -124,6 +119,7 @@ target_compile_definitions(catcheye_guard
 target_link_libraries(catcheye_guard
     PUBLIC
         catcheye::vision_input
+        catcheye::vision_detection
         catcheye::vision_roi
         catcheye::vision_protocol
         catcheye::vision_runtime
@@ -131,10 +127,7 @@ target_link_libraries(catcheye_guard
         ${OpenCV_LIBS}
         lapack
         blas
-        ncnn
         spdlog::spdlog
-    PRIVATE
-        yaml-cpp::yaml-cpp
 )
 
 if(GPIOD_LIBRARY)
@@ -225,6 +218,13 @@ install(TARGETS catcheye_vision_input
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+install(TARGETS catcheye_vision_detection
+    EXPORT catcheye_guard_targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
 install(TARGETS catcheye_vision_roi
     EXPORT catcheye_guard_targets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -275,6 +275,10 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
 )
 
 install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-input/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-detection/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 

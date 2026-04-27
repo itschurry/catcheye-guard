@@ -8,7 +8,7 @@
 #include "catcheye/roi/camera_roi_config.hpp"
 #include "catcheye/protocol/frame_message.hpp"
 #include "catcheye/runtime/frame_processor.hpp"
-#include "guard/detector_interface.hpp" // IDetector
+#include "catcheye/detection/detector.hpp"
 #include "guard/detection_postprocess.hpp"
 #include "guard/processor_config.hpp"
 
