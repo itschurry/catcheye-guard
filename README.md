@@ -198,6 +198,26 @@ docker compose -f docker/docker-compose.dev.yml run --rm catcheye-guard-dev bash
 - `ncnn`: `/opt/sysroots/raspi/usr`
 - `libcamera`: `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu`
 
+Hailo 백엔드를 크로스컴파일하려면 HailoRT arm64 Debian 패키지를 sysroot에 직접 풀어야 한다.
+HailoRT 패키지는 Docker 이미지가 자동으로 내려받지 않는다.
+
+1. Hailo 개발자 페이지에서 `hailort_x.x.x_arm64.deb` 를 다운로드한다.
+   - 다운로드 URL: https://hailo.ai/developer-zone/software-downloads/?product=ai_accelerators&device=hailo_8_8l
+   - 예: `hailort_5.3.0_arm64.deb`
+2. 컨테이너 안에서 sysroot에 추출한다.
+
+```bash
+sudo dpkg-deb -x hailort_x.x.x_arm64.deb /opt/sysroots/raspi
+```
+
+설치 확인:
+
+```bash
+ls /opt/sysroots/raspi/usr/include/hailo/hailort.hpp
+ls /opt/sysroots/raspi/usr/lib/libhailort.so*
+ls /opt/sysroots/raspi/usr/lib/cmake/HailoRT/HailoRTConfig.cmake
+```
+
 GPIO 신호를 쓰려면 빌드 타임에 `libgpiod`가 반드시 필요하다.
 `libgpiod` 누락 상태면 설정 단계에서 아래처럼 멈춘다.
 
