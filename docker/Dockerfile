@@ -1,4 +1,4 @@
-FROM --platform=$TARGETPLATFORM debian:bookworm
+FROM --platform=$TARGETPLATFORM debian:trixie
 
 LABEL authors="itschurry"
 LABEL maintainer="itschurry"
@@ -102,6 +102,7 @@ RUN set -eux; \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_INSTALL_LIBDIR=lib/aarch64-linux-gnu \
+      -DNCNN_SHARED_LIB=ON \
       -DNCNN_VULKAN=OFF \
       -DNCNN_BUILD_TOOLS=OFF \
       -DNCNN_BUILD_EXAMPLES=OFF; \

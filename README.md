@@ -42,12 +42,14 @@ cd /opt/catcheye-guard
 
 ## ARM 장비 준비
 
-장비에는 `hailo-all`과 카메라 런타임이 먼저 설치되어 있어야 한다.
+장비에는 `hailo-all`과 카메라 런타임, 의존 라이브러리 들이 먼저 설치되어 있어야 한다.
 Hailo가 없는 장비도 같은 기준으로 맞춘다. 저장공간보다 런타임 충돌 줄이는 게 더 싸다.
 
 ```bash
 sudo apt update
 sudo apt install -y hailo-all
+
+sudo apt install -y libyaml-cpp-dev libgstrtspserver-1.0-dev libspdlog-dev
 ```
 
 설치 확인:
@@ -68,7 +70,7 @@ hailortcli fw-control identify || true
 ```bash
 sudo apt update
 sudo apt install -y \
-  libcamera0.4 \
+  libcamera0.7 \
   libcamera-tools \
   gstreamer1.0-libcamera
 ```
