@@ -1,11 +1,11 @@
-name: catcheye-guard
+name: catcheye-guard-raspbian
 services:
   catcheye-guard-dev:
     extends:
       file: docker-compose.base.yml
       service: robot-base
-    image: ghcr.io/itschurry/catcheye-guard:develop
-    container_name: catcheye-guard-develop
+    image: ghcr.io/itschurry/catcheye-guard:develop-raspbian
+    container_name: catcheye-guard-develop-raspbian
     working_dir: $HOME/catcheye-guard
     environment:
       - BUILD_TYPE=develop

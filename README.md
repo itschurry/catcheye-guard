@@ -1,25 +1,27 @@
 ## CatchEye Guard
 
 Raspberry Pi ARM64 환경을 대상으로 빌드하고 배포하는 감시 애플리케이션이다.
-개발 PC에서는 Docker 기반 sysroot를 사용해 크로스컴파일하고, ARM 장비에서는 설치 결과물을 그대로 실행한다.
+개발 PC(Windows 포함)에서는 Docker buildx/compose로 `linux/arm64` 개발 이미지를 빌드하고, 컨테이너 안에서 ARM64 타겟 빌드를 수행한다.
+실행 대상 Raspberry Pi는 `Raspberry Pi OS + hailo-all + 카메라 런타임 + catcheye-guard` 구성을 기준으로 한다.
 
 ### 빠른 시작
 
 개발 PC에서:
 
 ```bash
+# x86_64 PC에서 arm64 컨테이너를 빌드/실행할 때 한 번만 필요하다.
+docker run --privileged --rm tonistiigi/binfmt --install arm64
+
 docker compose -f docker/docker-compose.dev.yml build
 docker compose -f docker/docker-compose.dev.yml run --rm catcheye-guard-dev bash
 
-cmake -S /home/user/catcheye-guard -B /home/user/catcheye-guard/build/aarch64 -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_TOOLCHAIN_FILE=/home/user/catcheye-guard/toolchains/aarch64-linux-gnu.cmake \
-  -DTARGET_SYSROOT=/opt/sysroots/raspi
+cmake -S /home/user/catcheye-guard -B /home/user/catcheye-guard/build/release -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release
 
-cmake --build /home/user/catcheye-guard/build/aarch64 -j$(nproc)
-cmake --install /home/user/catcheye-guard/build/aarch64 --prefix /home/user/catcheye-guard/install/aarch64
+cmake --build /home/user/catcheye-guard/build/release -j$(nproc)
+cmake --install /home/user/catcheye-guard/build/release --prefix /home/user/catcheye-guard/install/release
 
-rsync -av /home/user/catcheye-guard/install/aarch64/ user@arm-device:/opt/catcheye-guard/
+rsync -av /home/user/catcheye-guard/install/release/ user@arm-device:/opt/catcheye-guard/
 ```
 
 ARM 장비에서:
@@ -31,45 +33,32 @@ cd /opt/catcheye-guard
 
 ## 빌드/배포 개요
 
-- Docker 이미지는 ARM64 sysroot 안에 앱 의존성을 미리 준비한다.
-- `libcamera`는 Ubuntu 패키지 대신 Raspberry Pi용 소스를 직접 크로스빌드해 sysroot에 넣는다.
-- 개발 PC에서는 그 sysroot를 사용해 앱을 크로스컴파일한다.
-- `cmake --install` 결과물에는 앱과 함께 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt` 런타임을 포함한다.
-- Raspberry Pi에는 `libcamera`와 카메라/미디어 런타임이 로컬에 준비되어 있어야 한다.
-
-사용 중인 툴체인 파일:
-
-- [`toolchains/aarch64-linux-gnu.cmake`](/home/user/catcheye-guard/toolchains/aarch64-linux-gnu.cmake)
+- Docker 이미지는 `linux/arm64` 플랫폼으로 빌드한다.
+- `libcamera`는 Raspberry Pi용 소스를 arm64 컨테이너 안에서 네이티브 빌드해 설치한다.
+- 개발 PC에서는 QEMU/binfmt 기반 arm64 컨테이너 안에서 앱을 빌드한다.
+- Raspberry Pi 런타임 기준은 `hailo-all`이다.
+- `cmake --install` 결과물에는 앱, 모델, 설정, 그리고 직접 빌드한 `ncnn` 런타임만 포함한다.
+- `OpenCV`, `GStreamer`, `libcamera`, `HailoRT`, `libstdc++` 등 시스템 스택은 Raspberry Pi에 설치된 패키지를 사용한다.
 
 ## ARM 장비 준비
 
-장비에는 아래 구성 요소가 먼저 설치되어 있어야 한다.
-
-- `GStreamer`
-- `gstreamer-rtsp-server`
-- 카메라 / 인코더 관련 GStreamer 플러그인
-
-Ubuntu 24.04 계열 예시:
+장비에는 `hailo-all`과 카메라 런타임이 먼저 설치되어 있어야 한다.
+Hailo가 없는 장비도 같은 기준으로 맞춘다. 저장공간보다 런타임 충돌 줄이는 게 더 싸다.
 
 ```bash
 sudo apt update
-sudo apt install -y \
-  gstreamer1.0-libav \
-  gstreamer1.0-libcamera \
-  gstreamer1.0-plugins-bad \
-  gstreamer1.0-plugins-base \
-  gstreamer1.0-plugins-good \
-  gstreamer1.0-plugins-ugly \
-  libgstrtspserver-1.0-0 \
-  gstreamer1.0-tools \
-  libgpiod-dev \
-  gpiod
+sudo apt install -y hailo-all
 ```
 
 설치 확인:
 
 ```bash
 gst-inspect-1.0 libcamerasrc
+python3 - <<'PY'
+import cv2
+print(cv2.__version__)
+PY
+hailortcli fw-control identify || true
 ```
 
 ### libcamera 설치
@@ -92,7 +81,7 @@ gst-inspect-1.0 libcamerasrc
 ```
 
 Raspberry Pi 카메라가 패키지 버전과 맞지 않으면 `raspberrypi/libcamera`를 직접 빌드한다.
-Docker 이미지는 아래와 같은 옵션으로 같은 저장소를 크로스빌드해서 sysroot에 넣는다.
+Docker 이미지는 아래와 같은 옵션으로 같은 저장소를 arm64 네이티브 빌드한다.
 
 ARM 장비에서 직접 빌드할 때:
 
@@ -145,7 +134,7 @@ export GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/a
 ### Hailo PCIe 드라이버
 
 Hailo 백엔드를 쓰려면 Raspberry Pi에서 Hailo-8/8L PCIe 드라이버가 먼저 잡혀야 한다.
-컨테이너/sysroot에 넣는 `hailort_*.deb` 는 빌드용이고, 실제 장비 드라이버 설치를 대신하지 않는다.
+`hailo-all`은 런타임 스택을 준비하지만, PCIe 장치가 실제로 잡혔는지는 반드시 확인해야 한다.
 
 커널 헤더와 DKMS 준비:
 
@@ -171,21 +160,30 @@ sudo dpkg -i ~/Downloads/hailort-pcie-driver_5.3.0_all.deb
 ```bash
 lsmod | grep hailo
 lspci | grep -i hailo
+ls -l /dev/hailo*
 hailortcli fw-control identify
 ```
 
-`hailortcli fw-control identify` 에서 Hailo 장치 정보가 안 나오면 앱 문제가 아니라 드라이버, PCIe, 전원, 커널 헤더 쪽부터 다시 봐야 한다.
+`lspci`에는 Hailo가 보이는데 `/dev/hailo*`나 `hailortcli fw-control identify`가 안 되면 앱 문제가 아니다.
+드라이버, DKMS, PCIe, 전원, 커널 헤더 쪽부터 다시 봐야 한다.
 
 참고:
 
-- 이 프로젝트는 Docker 이미지 빌드 시 `raspberrypi/libcamera`를 소스 크로스빌드해 `${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu` 아래에 설치한다.
-- 크로스빌드는 이 sysroot를 사용하지만, `cmake --install` 결과물에는 `libcamera` 런타임을 번들하지 않는다.
-- Raspberry Pi에는 로컬 `libcamera`, IPA 모듈, tuning/config 데이터가 별도로 준비되어 있어야 한다.
-- `gstreamer`의 `libcamerasrc`는 `libcamera` 런타임 세트와 강하게 결합되어 있으므로, Raspberry Pi에서 직접 구성한 `libcamera` 환경 기준으로 검증하는 것을 권장한다.
+- 이 프로젝트는 Docker 이미지 빌드 시 `raspberrypi/libcamera`를 arm64 컨테이너 안에서 소스 빌드해 `/usr/lib/aarch64-linux-gnu` 아래에 설치한다.
+- `cmake --install` 결과물에는 `libcamera`, `OpenCV`, `GStreamer`, `HailoRT` 런타임을 번들하지 않는다.
+- Raspberry Pi에서는 `hailo-all`과 로컬 카메라 런타임을 기준으로 실행한다.
 
 ## 개발 PC에서 빌드
 
 개발 PC에서는 `docker compose`로 이미지를 빌드한 뒤 컨테이너에 들어가 작업한다.
+`docker/docker-compose.base.yml`에서 `platform: linux/arm64`를 고정하므로 Docker는 arm64 이미지를 빌드한다.
+
+x86_64 PC라면 QEMU/binfmt가 필요하다. 이거 안 해두면 `exec /bin/bash: exec format error`가 난다.
+
+```bash
+docker run --privileged --rm tonistiigi/binfmt --install arm64
+docker buildx inspect --bootstrap
+```
 
 ```bash
 docker compose -f docker/docker-compose.dev.yml build
@@ -194,72 +192,84 @@ docker compose -f docker/docker-compose.dev.yml run --rm catcheye-guard-dev bash
 
 이미지 빌드 과정에서 아래 항목이 자동으로 준비된다.
 
-- target sysroot: `/opt/sysroots/raspi`
-- `ncnn`: `/opt/sysroots/raspi/usr`
-- `libcamera`: `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu`
+- `ncnn`: `/usr/local`
+- `libcamera`: `/usr/lib/aarch64-linux-gnu`
 
-Hailo 백엔드를 크로스컴파일하려면 HailoRT arm64 Debian 패키지를 sysroot에 직접 풀어야 한다.
-HailoRT 패키지는 Docker 이미지가 자동으로 내려받지 않는다.
+Hailo 백엔드를 빌드하려면 HailoRT arm64 개발 패키지가 컨테이너에 있어야 한다.
+Hailo 패키지는 Docker 이미지가 자동으로 내려받지 않는다.
 
 1. Hailo 개발자 페이지에서 `hailort_x.x.x_arm64.deb` 를 다운로드한다.
    - 다운로드 URL: https://hailo.ai/developer-zone/software-downloads/?product=ai_accelerators&device=hailo_8_8l
    - 예: `hailort_5.3.0_arm64.deb`
-2. 컨테이너 안에서 sysroot에 추출한다.
+2. 컨테이너 안에서 설치한다.
 
 ```bash
-sudo dpkg-deb -x hailort_x.x.x_arm64.deb /opt/sysroots/raspi
+sudo apt install ./hailort_x.x.x_arm64.deb
 ```
 
 설치 확인:
 
 ```bash
-ls /opt/sysroots/raspi/usr/include/hailo/hailort.hpp
-ls /opt/sysroots/raspi/usr/lib/libhailort.so*
-ls /opt/sysroots/raspi/usr/lib/cmake/HailoRT/HailoRTConfig.cmake
+ls /usr/include/hailo/hailort.hpp
+ls /usr/lib/libhailort.so*
+ls /usr/lib/cmake/HailoRT/HailoRTConfig.cmake
 ```
 
 GPIO 신호를 쓰려면 빌드 타임에 `libgpiod`가 반드시 필요하다.
 `libgpiod` 누락 상태면 설정 단계에서 아래처럼 멈춘다.
 
 ```bash
-cmake -S /home/user/catcheye-guard -B /home/user/catcheye-guard/build/aarch64 -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_TOOLCHAIN_FILE=/home/user/catcheye-guard/toolchains/aarch64-linux-gnu.cmake \
-  -DTARGET_SYSROOT=/opt/sysroots/raspi
+cmake -S /home/user/catcheye-guard -B /home/user/catcheye-guard/build/release -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release
 ```
 
-핵심: 호스트와 `${TARGET_SYSROOT}` 둘 다 `libgpiod-dev`, `gpiod`가 있어야 한다.
+핵심: 컨테이너 안에 `libgpiod-dev`, `gpiod`가 있어야 한다.
 
 설치 결과 확인:
 
 ```bash
-ls /opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/pkgconfig
-ls /opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/cmake/ncnn
-ls /opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/libcamera.so*
-ls /opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/libcamera
-ls /opt/sysroots/raspi/usr/share/libcamera
+ls /usr/lib/aarch64-linux-gnu/pkgconfig
+ls /usr/local/lib/aarch64-linux-gnu/cmake/ncnn
+ls /usr/lib/aarch64-linux-gnu/libcamera.so*
+ls /usr/lib/aarch64-linux-gnu/libcamera
+ls /usr/share/libcamera
 ```
 
-컨테이너 안에서 앱을 크로스컴파일한다.
+컨테이너 안에서 앱을 빌드한다.
 
 ```bash
-cmake -S /home/user/catcheye-guard -B /home/user/catcheye-guard/build/aarch64 -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_TOOLCHAIN_FILE=/home/user/catcheye-guard/toolchains/aarch64-linux-gnu.cmake \
-  -DTARGET_SYSROOT=/opt/sysroots/raspi
+cmake -S /home/user/catcheye-guard -B /home/user/catcheye-guard/build/release -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release
 
-cmake --build /home/user/catcheye-guard/build/aarch64 -j$(nproc)
-cmake --install /home/user/catcheye-guard/build/aarch64 --prefix /home/user/catcheye-guard/install/aarch64
+cmake --build /home/user/catcheye-guard/build/release -j$(nproc)
+cmake --install /home/user/catcheye-guard/build/release --prefix /home/user/catcheye-guard/install/release
 ```
 
-`cmake --install` 단계에서는 `ncnn`, `OpenCV`, `yaml-cpp`, `spdlog`, `fmt` 런타임도 `install/aarch64` 아래로 함께 복사된다.
+`cmake --install` 단계에서는 앱, 모델, 설정, `libncnn.so*`만 `install/release` 아래로 준비한다.
+나머지 런타임은 Raspberry Pi의 `hailo-all`/시스템 패키지를 쓴다.
+
+Hailo 백엔드를 포함하려면 HailoRT 설치 후 별도 빌드 디렉터리를 쓴다.
+
+```bash
+cmake -S /home/user/catcheye-guard -B /home/user/catcheye-guard/build/release-hailo -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON
+
+cmake --build /home/user/catcheye-guard/build/release-hailo -j$(nproc)
+cmake --install /home/user/catcheye-guard/build/release-hailo --prefix /home/user/catcheye-guard/install/release-hailo
+```
+
+VS Code task도 같은 구조다.
+
+- `cmake: configure[Release]` / `cmake: build[Release]` / `cmake: install[Release]`
+- `cmake: configure[Release,Hailo]` / `cmake: build[Release,Hailo]` / `cmake: install[Release,Hailo]`
 
 ## 배포
 
 개발 PC에서:
 
 ```bash
-rsync -av install/aarch64/ user@arm-device:/opt/catcheye-guard/
+rsync -av install/release/ user@arm-device:/opt/catcheye-guard/
 ```
 
 ARM 장비에서 복사 결과 확인:
@@ -388,13 +398,13 @@ CSI 카메라 + `gstreamer` 소스 + RTSP 송출:
 CSI 카메라 + `gstreamer` 소스 + WebSocket 송출:
 
 ```bash
-./install/release/./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector ncnn
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector ncnn
 ```
 
 CSI 카메라 + `gstreamer` 소스 + WebSocket 송출 + Hailo 백엔드:
 
 ```bash
-./install/release/./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
 ```
 
 USB 카메라 + `gstreamer` 소스:
@@ -466,31 +476,31 @@ ROI 이탈 시 GPIO18로 100ms pulse 출력:
 Hailo HEF 모델을 쓰는 예시:
 
 ```bash
-./install/release/./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
 ```
 
 ## 문제 생기면 확인
 
 `Could not find OpenCVConfig.cmake`
 
-- `-DTARGET_SYSROOT=/opt/sysroots/raspi`
-- `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/cmake/opencv4`
+- `libopencv-dev` 설치 상태를 확인한다.
+- `/usr/lib/aarch64-linux-gnu/cmake/opencv4`
 
 `Could not find ncnn`
 
-- `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/cmake/ncnn/ncnnConfig.cmake`
+- `/usr/local/lib/aarch64-linux-gnu/cmake/ncnn/ncnnConfig.cmake`
 
 `Could not find HailoRT`
 
 - HailoRT SDK/런타임 설치 상태를 확인한다.
-- `hailort_*.deb` 를 sysroot에 추출했는지 확인한다.
+- `hailort_*.deb` 를 컨테이너에 설치했는지 확인한다.
 - 이 패키지는 CMake config를 보통 `/usr/lib/cmake/HailoRT` 아래에 둔다.
-- CMake가 못 찾으면 `-DHailoRT_DIR=/opt/sysroots/raspi/usr/lib/cmake/HailoRT` 를 넘긴다.
+- CMake가 못 찾으면 `-DHailoRT_DIR=/usr/lib/cmake/HailoRT` 를 넘긴다.
 
 `pkg-config`로 `libcamera` / `gstreamer`를 못 찾음
 
-- `/opt/sysroots/raspi/usr/lib/aarch64-linux-gnu/pkgconfig`
-- `toolchains/aarch64-linux-gnu.cmake`의 `PKG_CONFIG_LIBDIR`
+- `/usr/local/lib/aarch64-linux-gnu/pkgconfig`
+- `/usr/lib/aarch64-linux-gnu/pkgconfig`
 
 `libcamerasrc` 오류
 
