@@ -68,7 +68,7 @@ message(STATUS "OpenCV version: ${OpenCV_VERSION}")
 
 find_package(spdlog REQUIRED)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GPIOD REQUIRED IMPORTED_TARGET libgpiod)
+pkg_check_modules(GPIOD REQUIRED IMPORTED_TARGET libgpiod>=2.0)
 message(STATUS "libgpiod version: ${GPIOD_VERSION}")
 
 # ---------------------------------------------------------------------------
@@ -120,8 +120,6 @@ target_link_libraries(catcheye_guard
         spdlog::spdlog
         PkgConfig::GPIOD
 )
-
-target_compile_definitions(catcheye_guard PUBLIC CATCHEYE_HAS_LIBGPIOD=1)
 
 set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
