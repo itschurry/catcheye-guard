@@ -249,7 +249,21 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
         for (const EvaluatedDetection& ed : evaluated_detections) {
             if (ed.roi_result.status == RoiEvaluationStatus::Restricted) {
                 has_roi_violation = true;
-                if (const auto log = logger()) {
+                const bool should_log_restricted =
+                    !has_logged_roi_restricted_ ||
+                    config_.roi_restricted_log_interval_frames == 0 ||
+                    (context.frame_index - last_roi_restricted_log_frame_) >= config_.roi_restricted_log_interval_frames;
+
+                if (should_log_restricted) {
+                    has_logged_roi_restricted_ = true;
+                    last_roi_restricted_log_frame_ = context.frame_index;
+                }
+
+                if (should_log_restricted) {
+                    const auto log = logger();
+                    if (!log) {
+                        continue;
+                    }
                     log->warn("ROI restricted: frame={}, class_id={}, score={:.2f}, reason={}", context.frame_index, ed.detection.class_id,
                               ed.detection.score, ed.roi_result.reason);
                 }

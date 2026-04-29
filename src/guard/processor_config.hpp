@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 #include "catcheye/hardware/gpio_signal_config.hpp"
@@ -19,6 +20,7 @@ struct GuardProcessorConfig {
     bool roi_enabled = false;
     std::string roi_config_path;
     catcheye::roi::CameraRoiConfig roi_config;
+    std::uint64_t roi_restricted_log_interval_frames = 100;
 
     // ── GPIO signal ──────────────────────────────────────────
     GpioSignalConfig roi_alert_gpio;
