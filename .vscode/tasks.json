@@ -106,7 +106,7 @@
     {
       "label": "cmake: install[Debug]",
       "type": "shell",
-      "command": "cmake --install build/debug --prefix install/debug",
+      "command": "rm -rf install/debug && cmake --install build/debug --prefix install/debug",
       "group": {
         "kind": "build",
         "isDefault": false
@@ -115,7 +115,7 @@
     {
       "label": "cmake: install[Release]",
       "type": "shell",
-      "command": "cmake --install build/release --prefix install/release",
+      "command": "rm -rf install/release && cmake --install build/release --prefix install/release",
       "group": {
         "kind": "build",
         "isDefault": false
@@ -124,7 +124,7 @@
     {
       "label": "cmake: install[Release,Hailo]",
       "type": "shell",
-      "command": "cmake --install build/release-hailo --prefix install/release-hailo",
+      "command": "rm -rf install/release-hailo && cmake --install build/release-hailo --prefix install/release-hailo",
       "group": {
         "kind": "build",
         "isDefault": false

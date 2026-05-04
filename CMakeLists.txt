@@ -291,6 +291,7 @@ install(
 )
 
 if(CATCHEYE_GUARD_BUNDLE_NCNN)
+    set(CATCHEYE_NCNN_LIBRARIES)
     set(CATCHEYE_NCNN_LIBRARY_DIRS)
     if(CMAKE_LIBRARY_ARCHITECTURE)
         list(APPEND CATCHEYE_NCNN_LIBRARY_DIRS
@@ -305,15 +306,20 @@ if(CATCHEYE_GUARD_BUNDLE_NCNN)
 
     foreach(ncnn_library_dir IN LISTS CATCHEYE_NCNN_LIBRARY_DIRS)
         if(EXISTS "${ncnn_library_dir}")
-            install(
-                DIRECTORY "${ncnn_library_dir}/"
-                DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                FILES_MATCHING
-                PATTERN "libncnn*.so"
-                PATTERN "libncnn*.so.*"
+            file(GLOB ncnn_libraries
+                "${ncnn_library_dir}/libncnn*.so"
+                "${ncnn_library_dir}/libncnn*.so.*"
             )
+            list(APPEND CATCHEYE_NCNN_LIBRARIES ${ncnn_libraries})
         endif()
     endforeach()
+
+    if(CATCHEYE_NCNN_LIBRARIES)
+        list(REMOVE_DUPLICATES CATCHEYE_NCNN_LIBRARIES)
+        install(FILES ${CATCHEYE_NCNN_LIBRARIES}
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        )
+    endif()
 endif()
 
 install(EXPORT catcheye_guard_targets

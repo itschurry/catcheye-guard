@@ -6,14 +6,13 @@ services:
       service: robot-base
     image: ghcr.io/itschurry/catcheye-guard:develop-raspbian
     container_name: catcheye-guard-develop-raspbian
-    working_dir: $HOME/catcheye-guard
+    working_dir: /home/user/catcheye-guard
     environment:
       - BUILD_TYPE=develop
     volumes:
-      - ../:$HOME/catcheye-guard:rw
-      - $HOME/shared:/mnt/shared:rw
-      - $HOME/.ssh:/home/user/.ssh:ro
-      - $HOME/.ssh/known_hosts:/home/user/.ssh/known_hosts:rw
+      - ../:/home/user/catcheye-guard:rw
+      - ${HOME}/shared:/mnt/shared:rw
+      - ${HOME}/.ssh:/home/user/.ssh:ro
       - vscode_server:/home/user/.vscode-server:rw
       - vscode_server_ext:/home/user/.vscode-server/extensions:rw
       - vscode_server_data:/home/user/.vscode-server/data:rw
