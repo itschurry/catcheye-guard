@@ -2,10 +2,8 @@
 set -euo pipefail
 
 ENV_CONTENT=$(cat <<EOF
-UID=$(id -u)
-GID=$(id -g)
-USER=$(id -un)
-HOME=$HOME
+USERNAME=user
+CONTAINER_HOME=/home/user
 GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0
 EOF
 )

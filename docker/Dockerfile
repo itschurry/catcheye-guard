@@ -9,7 +9,7 @@ ARG LIBCAMERA_REF=main
 
 ARG UID=1000
 ARG GID=1000
-ARG USERNAME=appuser
+ARG USERNAME=user
 ARG HOME=/home/${USERNAME}
 
 ENV TZ=Asia/Seoul
@@ -54,9 +54,7 @@ RUN set -eux; \
 
 # User setup
 RUN set -eux; \
-    if getent group "${GID}" >/dev/null; then \
-      groupmod -n "${USERNAME}" "$(getent group "${GID}" | cut -d: -f1)"; \
-    else \
+    if ! getent group "${GID}" >/dev/null; then \
       groupadd -g "${GID}" "${USERNAME}"; \
     fi; \
     useradd -m -u "${UID}" -g "${GID}" -d "${HOME}" -s /bin/bash "${USERNAME}"; \
