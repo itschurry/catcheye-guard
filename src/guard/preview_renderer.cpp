@@ -43,23 +43,6 @@ cv::Scalar detection_color(const EvaluatedDetection& detection, bool roi_enabled
     return cv::Scalar(255, 255, 255);
 }
 
-std::string roi_status_text(const EvaluatedDetection& detection, bool roi_enabled) {
-    if (!roi_enabled) {
-        return "ROI OFF";
-    }
-
-    switch (detection.roi_result.status) {
-        case RoiEvaluationStatus::Allowed:
-            return "ALLOWED";
-        case RoiEvaluationStatus::Restricted:
-            return "RESTRICTED";
-        case RoiEvaluationStatus::Invalid:
-            return "ROI INVALID";
-    }
-
-    return "ROI UNKNOWN";
-}
-
 } // namespace
 
 void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_config) {
@@ -126,43 +109,12 @@ void draw_detections(
     const std::vector<EvaluatedDetection>& detections,
     const IDetector& detector,
     bool roi_enabled) {
+    (void)detector;
+
     for (const EvaluatedDetection& evaluated_detection : detections) {
         const cv::Rect box = to_rect(evaluated_detection.detection.box);
         const cv::Scalar color = detection_color(evaluated_detection, roi_enabled);
         cv::rectangle(image, box, color, 2);
-
-        const std::string label =
-            detector.class_name(evaluated_detection.detection.class_id)
-            + " "
-            + cv::format("%.2f", evaluated_detection.detection.score)
-            + " "
-            + roi_status_text(evaluated_detection, roi_enabled);
-
-        int baseline = 0;
-        const cv::Size text_size = cv::getTextSize(
-            label,
-            cv::FONT_HERSHEY_SIMPLEX,
-            0.5,
-            1,
-            &baseline);
-
-        const int label_x = std::max(box.x, 0);
-        const int label_y = std::max(box.y - 4, text_size.height + 4);
-        const cv::Rect background(
-            label_x,
-            label_y - text_size.height - 6,
-            text_size.width + 6,
-            text_size.height + 6);
-
-        cv::rectangle(image, background, color, cv::FILLED);
-        cv::putText(
-            image,
-            label,
-            cv::Point(label_x + 3, label_y - 3),
-            cv::FONT_HERSHEY_SIMPLEX,
-            0.5,
-            cv::Scalar(0, 0, 0),
-            1);
     }
 }
 
