@@ -4,7 +4,7 @@ install
 log/*
 CMakeFiles/
 CMakeCache.txt
-Makefilez
+Makefile
 cmake_install.cmake
 compile_commands.json
 .codex
