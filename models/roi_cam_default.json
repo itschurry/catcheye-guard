@@ -5,7 +5,7 @@
   "allowed_zones": [
     {
       "id": "zone_main_floor",
-      "name": "main_safe_zone",
+      "name": "main_danger_zone",
       "enabled": true,
       "points": [
         [

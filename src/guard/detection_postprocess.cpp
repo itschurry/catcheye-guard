@@ -6,12 +6,20 @@ namespace {
 catcheye::roi::EvaluationResult evaluate_detection_roi(
     const Detection& detection,
     const catcheye::roi::CameraRoiConfig& roi_config) {
-    return catcheye::roi::evaluate_bbox_fully_inside(
+    auto result = catcheye::roi::evaluate_bbox_intersects(
         static_cast<double>(detection.box.x),
         static_cast<double>(detection.box.y),
         static_cast<double>(detection.box.width),
         static_cast<double>(detection.box.height),
         roi_config);
+
+    if (result.status == catcheye::roi::EvaluationStatus::Allowed) {
+        return {catcheye::roi::EvaluationStatus::Restricted, "person intersects a danger zone"};
+    }
+    if (result.status == catcheye::roi::EvaluationStatus::Restricted) {
+        return {catcheye::roi::EvaluationStatus::Allowed, "person is outside all danger zones"};
+    }
+    return result;
 }
 
 } // namespace

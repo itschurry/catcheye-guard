@@ -264,7 +264,7 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
                     if (!log) {
                         continue;
                     }
-                    log->warn("ROI restricted: frame={}, class_id={}, score={:.2f}, reason={}", context.frame_index, ed.detection.class_id,
+                    log->warn("ROI danger: frame={}, class_id={}, score={:.2f}, reason={}", context.frame_index, ed.detection.class_id,
                               ed.detection.score, ed.roi_result.reason);
                 }
             }

@@ -324,7 +324,7 @@ cd /opt/catcheye-guard
 - `--hef <path>`: Hailo 백엔드에서 사용할 HEF 모델 경로를 지정한다.
 - `--metadata <path>`: 클래스 이름 메타데이터 YAML 경로를 지정한다.
 - `--num-threads <n>`: NCNN 추론 스레드 수를 지정한다.
-- `--roi-alert-gpio <line>`: ROI 이탈이 처음 감지될 때 pulse를 보낼 GPIO line 번호를 지정한다. 비활성화하려면 생략하거나 `-1`을 쓴다.
+- `--roi-alert-gpio <line>`: 위험 ROI 진입이 처음 감지될 때 pulse를 보낼 GPIO line 번호를 지정한다. 비활성화하려면 생략하거나 `-1`을 쓴다.
 - `--roi-alert-pulse-ms <ms>`: ROI 알림 GPIO pulse 길이를 밀리초 단위로 지정한다.
 - `--roi-alert-active-low`: active-low 출력으로 GPIO를 요청한다.
 - `--gpio-chip <path>`: 기본 GPIO 칩 경로(`/dev/gpiochip0`)를 덮어쓴다.
@@ -427,7 +427,7 @@ USB 카메라 + `gstreamer` 소스 + WebSocket 송출:
 ./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --ws 8080
 ```
 
-ROI 이탈 시 GPIO18로 100ms pulse 출력:
+위험 ROI 진입 시 GPIO18로 100ms pulse 출력:
 
 ```bash
 ./bin/catcheye-guard --camera --roi-alert-gpio 18 --roi-alert-pulse-ms 100
@@ -518,7 +518,7 @@ Hailo HEF 모델을 쓰는 예시:
 - JSON 저장소: 경량 엔진 내장 JSON 파서를 이용한 로드/저장 및 파싱/직렬화
 - 검증 기능: 잘못된 입력에 대한 구조화된 이슈 정보 제공
 - 기하 연산: 점-폴리곤 포함 판정(오목 폴리곤 지원), 폴리곤 면적, 경계 계산, 자기 교차 검사
-- 침입 후보 평가 헬퍼: `evaluate_reference_point`, `evaluate_bbox_bottom_center`, `evaluate_bbox_fully_inside`
+- 침입 후보 평가 헬퍼: `evaluate_reference_point`, `evaluate_bbox_bottom_center`, `evaluate_bbox_fully_inside`, `evaluate_bbox_intersects`
 
 빠른 사용 예시:
 
@@ -533,7 +533,7 @@ if (!parsed.success) {
     // 파싱 에러 처리
 }
 
-EvaluationResult decision = evaluate_bbox_fully_inside(100, 50, 80, 150, parsed.config);
+EvaluationResult decision = evaluate_bbox_intersects(100, 50, 80, 150, parsed.config);
 // Allowed / Restricted / Invalid
 ```
 
@@ -542,7 +542,7 @@ EvaluationResult decision = evaluate_bbox_fully_inside(100, 50, 80, 150, parsed.
 - ROI 포인트는 원본 이미지 좌표계를 기준으로 해석된다.
 - 비활성화된 영역은 설정에는 유지되지만 평가 시에는 무시된다.
 - 일반적인 잘못된 입력은 예외 대신 결과 구조체로 반환된다.
-- 라이브 프리뷰 파이프라인에서는 바운딩 박스 전체가 활성 ROI 안에 포함될 때만 허용으로 판단한다.
+- 라이브 프리뷰 파이프라인에서는 바운딩 박스가 활성 위험 ROI를 침범하면 알람으로 판단한다.
 
 ## 커밋 메시지 규칙
 
