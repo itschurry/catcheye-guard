@@ -1,10 +1,28 @@
-## CatchEye Guard
+# CatchEye Guard
 
 Raspberry Pi ARM64 환경을 대상으로 빌드하고 배포하는 감시 애플리케이션이다.
 개발 PC(Windows 포함)에서는 Docker buildx/compose로 `linux/arm64` 개발 이미지를 빌드하고, 컨테이너 안에서 ARM64 타겟 빌드를 수행한다.
 실행 대상 Raspberry Pi는 `Raspberry Pi OS + hailo-all + 카메라 런타임 + catcheye-guard` 구성을 기준으로 한다.
 
-### 빠른 시작
+## 주요 기능
+
+- 카메라, 이미지, 동영상 입력 처리
+- NCNN 기본 detector, 선택적 Hailo detector
+- ROI 기반 위험 영역 판정
+- 위험 ROI 진입 시 GPIO pulse 출력
+- WebSocket 기본 결과 송출
+- 선택적 RTSP 결과 송출
+- 실행 중 ROI 설정 조회/교체 HTTP API
+
+## 기본 포트
+
+| 기능 | 기본 포트 | 주소 |
+| --- | ---: | --- |
+| WebSocket | `8080` | `ws://<host>:8080/` |
+| RTSP | `8554` | `rtsp://<host>:8554/stream` |
+| ROI HTTP API | `8090` | `http://<host>:8090/api/roi` |
+
+## 빠른 시작
 
 개발 PC에서:
 
@@ -28,7 +46,7 @@ ARM 장비에서:
 
 ```bash
 cd /opt/catcheye-guard
-./bin/catcheye-guard --camera
+./bin/catcheye-guard --camera --ws
 ```
 
 ## 빌드/배포 개요
@@ -42,7 +60,7 @@ cd /opt/catcheye-guard
 
 ## ARM 장비 준비
 
-장비에는 `hailo-all`과 카메라 런타임, 의존 라이브러리 들이 먼저 설치되어 있어야 한다.
+장비에는 `hailo-all`과 카메라 런타임, 의존 라이브러리들이 먼저 설치되어 있어야 한다.
 Hailo가 없는 장비도 같은 기준으로 맞춘다. 저장공간보다 런타임 충돌 줄이는 게 더 싸다.
 
 ```bash
@@ -287,7 +305,7 @@ ARM 장비에서:
 
 ```bash
 cd /opt/catcheye-guard
-./bin/catcheye-guard --camera
+./bin/catcheye-guard --camera --ws
 ```
 
 실행 파일 구조:
@@ -320,6 +338,7 @@ cd /opt/catcheye-guard
 
 - `--rtsp [port]`: RTSP 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
 - `--ws [port]`: WebSocket 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
+- `--http-port <port>`: ROI HTTP API 포트를 지정한다. 기본값은 `8090` 이다.
 - `--viewer-only`: 검출 없이 카메라 프레임만 송출한다. `--camera` 와 `--rtsp` 또는 `--ws` 가 필요하다.
 - `--detector <ncnn|hailo>`: detector 백엔드를 선택한다. 기본값은 `ncnn` 이다.
 - `--hef <path>`: Hailo 백엔드에서 사용할 HEF 모델 경로를 지정한다.
@@ -328,7 +347,7 @@ cd /opt/catcheye-guard
 - `--roi-alert-gpio <line>`: 위험 ROI 진입이 처음 감지될 때 pulse를 보낼 GPIO line 번호를 지정한다. 비활성화하려면 생략하거나 `-1`을 쓴다.
 - `--roi-alert-pulse-ms <ms>`: ROI 알림 GPIO pulse 길이를 밀리초 단위로 지정한다.
 - `--roi-alert-active-low`: active-low 출력으로 GPIO를 요청한다.
-- `--gpio-chip <path>`: 기본 GPIO 칩 경로(`/dev/gpiochip0`)를 덮어쓴다.
+- `--gpio-chip <path>`: 기본 GPIO 칩 경로(`/dev/gpiochip4`)를 덮어쓴다.
 
 위치 인자:
 
@@ -364,6 +383,7 @@ cd /opt/catcheye-guard
 - `--image`, `--video` 는 항상 `gstreamer` 입력이다.
 - `--rtsp` 는 입력 소스를 바꾸지 않고 출력만 RTSP 송출로 바꾼다.
 - `--ws` 는 입력 소스를 바꾸지 않고 출력만 WebSocket 송출로 바꾼다.
+- 운영 기본은 WebSocket 송출이다. RTSP는 RTSP 클라이언트가 꼭 필요할 때만 선택한다.
 - `--viewer-only` 는 detector, ROI HTTP API, ROI GPIO 알림을 시작하지 않는다.
 
 WebSocket 송출 형식:
@@ -372,6 +392,78 @@ WebSocket 송출 형식:
 - 프레임마다 텍스트 프레임 1개와 바이너리 프레임 1개를 순서대로 받는다.
 - 텍스트 프레임에는 `frame_index`, `stream_name`, `width`, `height`, `stride`, `pixel_format`, `timestamp`, `payload_encoding`, `payload_size`, `metadata` 가 JSON으로 담긴다.
 - 바이너리 프레임에는 JPEG 인코딩된 이미지 바이트가 담긴다.
+
+## API
+
+실행 중 ROI 설정을 조회하거나 교체할 때 HTTP API를 쓴다.
+서버는 기본으로 `0.0.0.0:8090` 에서 뜬다. 포트는 `--http-port` 로 바꾼다.
+`--viewer-only` 에서는 HTTP API가 뜨지 않는다.
+인증은 없다. 외부망에 그대로 열면 안 된다.
+
+```bash
+./bin/catcheye-guard --camera --http-port 8090
+```
+
+### ROI 설정 조회
+
+`GET /api/roi`
+
+```bash
+curl http://<host>:8090/api/roi
+```
+
+응답:
+
+```json
+{
+  "camera_id": "cam_default",
+  "image_width": 1280,
+  "image_height": 720,
+  "allowed_zones": [
+    {
+      "id": "zone_main_floor",
+      "name": "main_danger_zone",
+      "enabled": true,
+      "points": [
+        [380.71853100328224, 193.48177060232413],
+        [792.2079304532956, 188.03157988113193],
+        [796.7337886986606, 508.6804754723677],
+        [369.81814956089784, 505.5051893905793]
+      ]
+    }
+  ]
+}
+```
+
+### ROI 설정 교체
+
+`PUT /api/roi`
+
+```bash
+curl -X PUT http://<host>:8090/api/roi \
+  -H 'Content-Type: application/json' \
+  --data-binary @models/roi_cam_default.json
+```
+
+성공하면 저장된 ROI JSON을 그대로 반환하고, 실행 중인 프로세서에도 즉시 반영한다.
+JSON 파싱이나 ROI 검증이 실패하면 `400`, 파일 저장이나 메모리 반영이 실패하면 `500` 을 반환한다.
+
+에러 응답:
+
+```json
+{
+  "error": "ROI config failed validation",
+  "details": [
+    "zone_index=0, point_index=2, message=..."
+  ]
+}
+```
+
+### 스트림 API
+
+- WebSocket이 기본 송출 방식이다. `--ws [port]` 로 켜고 `ws://<host>:<port>/` 로 받는다. 기본 포트는 `8080` 이다.
+- WebSocket은 프레임마다 JSON 텍스트 프레임 다음에 JPEG 바이너리 프레임을 보낸다.
+- RTSP는 선택사항이다. `--rtsp [port]` 로 켜고 `rtsp://<host>:<port>/stream` 으로 본다. 기본 포트는 `8554` 다.
 
 ## 권장 실행 예시
 
@@ -514,39 +606,42 @@ Hailo HEF 모델을 쓰는 예시:
 
 ## ROI 엔진 모듈
 
-이 저장소에는 `include/catcheye/guard/roi` 및 `src/guard/roi` 아래에 재사용 가능한 ROI 엔진이 포함되어 있습니다.
+ROI 엔진은 `third_party/catcheye-vision-sdk/libs/vision-roi` 아래에 있다.
 
 제공 기능:
 
 - 도메인 모델: 포인트, ROI 폴리곤, 카메라 ROI 설정
-- JSON 저장소: 경량 엔진 내장 JSON 파서를 이용한 로드/저장 및 파싱/직렬화
-- 검증 기능: 잘못된 입력에 대한 구조화된 이슈 정보 제공
-- 기하 연산: 점-폴리곤 포함 판정(오목 폴리곤 지원), 폴리곤 면적, 경계 계산, 자기 교차 검사
-- 침입 후보 평가 헬퍼: `evaluate_reference_point`, `evaluate_bbox_bottom_center`, `evaluate_bbox_fully_inside`, `evaluate_bbox_intersects`
+- JSON 저장소: ROI 설정 로드/저장 및 파싱/직렬화
+- 검증 기능: 잘못된 ROI 설정에 대한 구조화된 이슈 제공
+- 기하 연산: 점-폴리곤 포함 판정, 폴리곤 면적, 경계 계산, 자기 교차 검사
+- 침입 후보 평가: bbox 기준 ROI 침범 판정
 
 빠른 사용 예시:
 
 ```cpp
-#include "catcheye/guard/roi/roi_repository.hpp"
-#include "catcheye/guard/roi/roi_evaluator.hpp"
+#include "catcheye/roi/roi_evaluator.hpp"
+#include "catcheye/roi/roi_repository.hpp"
 
-using namespace catcheye::guard::roi;
+using namespace catcheye::roi;
 
 auto parsed = RoiRepository::load_from_file("roi_cam_01.json");
 if (!parsed.success) {
-    // 파싱 에러 처리
+    return;
 }
 
-EvaluationResult decision = evaluate_bbox_intersects(100, 50, 80, 150, parsed.config);
-// Allowed / Restricted / Invalid
+const EvaluationResult decision = evaluate_bbox_intersects(
+    100.0,
+    50.0,
+    80.0,
+    150.0,
+    parsed.config);
 ```
 
 참고:
 
 - ROI 포인트는 원본 이미지 좌표계를 기준으로 해석된다.
 - 비활성화된 영역은 설정에는 유지되지만 평가 시에는 무시된다.
-- 일반적인 잘못된 입력은 예외 대신 결과 구조체로 반환된다.
-- 라이브 프리뷰 파이프라인에서는 바운딩 박스가 활성 위험 ROI를 침범하면 알람으로 판단한다.
+- 라이브 파이프라인에서는 바운딩 박스가 활성 위험 ROI를 침범하면 알람으로 판단한다.
 
 ## 커밋 메시지 규칙
 
