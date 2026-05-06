@@ -11,6 +11,8 @@ namespace catcheye {
 namespace {
 
 using RoiEvaluationStatus = catcheye::roi::EvaluationStatus;
+const cv::Scalar kEnabledRoiColor(0, 215, 255);
+const cv::Scalar kDisabledRoiColor(128, 128, 128);
 
 cv::Rect to_rect(const BoundingBox& box) {
     return cv::Rect(
@@ -64,7 +66,7 @@ void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_co
             for (const auto& point : zone.points) {
                 polygon.push_back(to_cv_point(point));
             }
-            const cv::Scalar color = draw_enabled ? cv::Scalar(0, 0, 255) : cv::Scalar(128, 128, 128);
+            const cv::Scalar color = draw_enabled ? kEnabledRoiColor : kDisabledRoiColor;
             const std::vector<std::vector<cv::Point>> polygons {polygon};
             cv::fillPoly(fill_overlay, polygons, color, cv::LINE_AA);
         }
@@ -85,7 +87,7 @@ void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_co
             polygon.push_back(to_cv_point(point));
         }
 
-        const cv::Scalar color = zone.enabled ? cv::Scalar(0, 0, 255) : cv::Scalar(128, 128, 128);
+        const cv::Scalar color = zone.enabled ? kEnabledRoiColor : kDisabledRoiColor;
         const int thickness = zone.enabled ? 2 : 1;
 
         cv::polylines(image, polygon, true, color, thickness, cv::LINE_AA);
