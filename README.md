@@ -393,7 +393,48 @@ WebSocket 송출 형식:
 - 텍스트 프레임에는 `frame_index`, `stream_name`, `width`, `height`, `stride`, `pixel_format`, `source_timestamp_ms`, `wall_timestamp_ms`, `payload_encoding`, `payload_size`, `metadata` 가 JSON으로 담긴다.
 - `source_timestamp_ms` 는 monotonic source timestamp 이며 프레임 간격/FPS 계산용이다. 실제 날짜/시간이나 클라이언트 시간과 비교하면 안 된다.
 - `wall_timestamp_ms` 는 WebSocket metadata 생성 시점의 Unix epoch milliseconds 이며 앱에서 표시용 날짜/시간으로 쓴다.
+- `metadata` 는 detector/ROI 결과를 담는 앱 메타데이터다. detection 모드에서는 `roi_enabled`, `detection_count`, `inference_ms`, `detections` 가 담긴다.
+- `detections` 항목에는 `class_id`, `class_name`, `score`, `bbox`, `roi_status`, `roi_reason` 이 담긴다.
+- viewer-only 모드에서는 `metadata` 가 `viewer_only`, `detection_count`, `detections` 만 담는다.
 - 바이너리 프레임에는 JPEG 인코딩된 이미지 바이트가 담긴다.
+
+텍스트 프레임 예시:
+
+```json
+{
+  "type": "frame",
+  "frame_index": 397,
+  "stream_name": "person-guard",
+  "width": 1280,
+  "height": 720,
+  "stride": 3840,
+  "pixel_format": "BGR",
+  "source_timestamp_ms": 123456789,
+  "wall_timestamp_ms": 1778061234567,
+  "payload_encoding": "jpeg",
+  "payload_size": 123456,
+  "metadata": {
+    "roi_enabled": true,
+    "detection_count": 1,
+    "inference_ms": 23.4,
+    "detections": [
+      {
+        "class_id": 0,
+        "class_name": "person",
+        "score": 0.91,
+        "bbox": {
+          "x": 100,
+          "y": 120,
+          "width": 80,
+          "height": 180
+        },
+        "roi_status": "restricted",
+        "roi_reason": "inside restricted zone"
+      }
+    ]
+  }
+}
+```
 
 ## API
 
