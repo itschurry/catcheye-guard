@@ -1,5 +1,6 @@
 #include "guard/processor.hpp"
 
+#include <chrono>
 #include <cstdint>
 #include <sstream>
 #include <string_view>
@@ -59,9 +60,10 @@ std::string escape_json(std::string_view value) {
     return escaped;
 }
 
-std::string build_metadata_json(const std::vector<EvaluatedDetection>& detections, const IDetector& detector, bool roi_enabled) {
+std::string build_metadata_json(const std::vector<EvaluatedDetection>& detections, const IDetector& detector, bool roi_enabled, double inference_ms) {
     std::ostringstream oss;
-    oss << "{\"roi_enabled\":" << (roi_enabled ? "true" : "false") << ",\"detection_count\":" << detections.size() << ",\"detections\":[";
+    oss << "{\"roi_enabled\":" << (roi_enabled ? "true" : "false") << ",\"detection_count\":" << detections.size()
+        << ",\"inference_ms\":" << inference_ms << ",\"detections\":[";
 
     for (std::size_t i = 0; i < detections.size(); ++i) {
         const auto& item = detections[i];
@@ -270,7 +272,11 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
     }
 
     if (context.should_process) {
+        const auto inference_started = std::chrono::steady_clock::now();
         cached_detections_ = detector_->detect(frame);
+        const auto inference_finished = std::chrono::steady_clock::now();
+        cached_inference_ms_ =
+            static_cast<double>(std::chrono::duration_cast<std::chrono::microseconds>(inference_finished - inference_started).count()) / 1000.0;
     }
 
     const RoiSnapshot roi = roi_snapshot();
@@ -325,7 +331,7 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
 
     output.has_message = true;
     output.message.stream_name = "person-guard";
-    output.message.metadata_json = build_metadata_json(evaluated_detections, *detector_, roi.enabled);
+    output.message.metadata_json = build_metadata_json(evaluated_detections, *detector_, roi.enabled, cached_inference_ms_);
 
     GuardProcessorConfig publish_config;
     publish_config.roi_enabled = roi.enabled;

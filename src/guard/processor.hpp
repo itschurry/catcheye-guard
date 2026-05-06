@@ -36,6 +36,7 @@ class GuardProcessor final : public catcheye::runtime::FrameProcessor {
     std::unique_ptr<IDetector> detector_;
     std::unique_ptr<catcheye::hardware::GpioPulseSignal> roi_alert_signal_;
     std::vector<Detection> cached_detections_;
+    double cached_inference_ms_ = 0.0;
     bool roi_violation_active_ = false;
     std::uint64_t last_roi_restricted_log_frame_ = 0;
     bool has_logged_roi_restricted_ = false;
