@@ -84,22 +84,23 @@ std::string describe_runtime_mode(const AppOptions& options)
     const bool rtsp_enabled = options.publisher_type == PublisherType::Rtsp;
     const bool websocket_enabled = options.publisher_type == PublisherType::WebSocket;
     const char* output_name = rtsp_enabled ? "rtsp output" : (websocket_enabled ? "websocket output" : "local output");
+    const char* processing_name = options.viewer_only ? "viewer only" : "detection";
 
     if (options.input.type == catcheye::input::InputSourceType::Camera) {
         if (!options.input.camera_pipeline.empty()) {
-            return std::string("csi camera + gstreamer source + ") + output_name;
+            return std::string("csi camera + gstreamer source + ") + processing_name + " + " + output_name;
         }
         if (!options.input.camera_device.empty()) {
-            return std::string("usb camera + gstreamer source + ") + output_name;
+            return std::string("usb camera + gstreamer source + ") + processing_name + " + " + output_name;
         }
-        return std::string("csi camera + libcamera source + ") + output_name;
+        return std::string("csi camera + libcamera source + ") + processing_name + " + " + output_name;
     }
 
     const char* input_name =
         options.input.type == catcheye::input::InputSourceType::ImageFile
         ? "image file"
         : "video file";
-    return std::string(input_name) + " + gstreamer source + " + output_name;
+    return std::string(input_name) + " + gstreamer source + " + processing_name + " + " + output_name;
 }
 
 } // namespace
@@ -181,6 +182,8 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.gpio_chip_path = args[i];
         } else if (arg == "--roi-alert-active-low") {
             options.roi_alert_active_low = true;
+        } else if (arg == "--viewer-only") {
+            options.viewer_only = true;
         } else if (arg == "--detector" && i + 1 < args.size()) {
             options.detector_backend = parse_detector_backend(args[++i]);
         } else if (arg == "--hef" && i + 1 < args.size()) {
@@ -238,6 +241,18 @@ AppOptions parse_app_options(int argc, char** argv) {
         throw std::runtime_error("camera dimensions must be even for NV12/RTSP output");
     }
 
+    if (options.viewer_only) {
+        if (options.input.type != catcheye::input::InputSourceType::Camera) {
+            throw std::runtime_error("--viewer-only is only valid with --camera");
+        }
+        if (options.publisher_type == PublisherType::None) {
+            throw std::runtime_error("--viewer-only requires --rtsp or --ws");
+        }
+        if (!options.hef_path.empty() || !options.metadata_path.empty() || !options.positional_args.empty()) {
+            throw std::runtime_error("model, metadata, and ROI path arguments are not used with --viewer-only");
+        }
+    }
+
     if ((options.input.type == catcheye::input::InputSourceType::ImageFile ||
          options.input.type == catcheye::input::InputSourceType::VideoFile) &&
         options.input.uri.empty()) {
@@ -269,6 +284,7 @@ LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path)
     }
 
     return LoadedRoiConfig{
+        .loaded = true,
         .path = roi_config_path,
         .config = roi_parse_result.config,
     };
@@ -277,6 +293,7 @@ LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path)
 AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& default_paths, const LoadedRoiConfig& loaded_roi_config) {
     AppBootstrap bootstrap;
 
+    bootstrap.processor_config.detection_enabled = !options.viewer_only;
     bootstrap.processor_config.detector.backend = options.detector_backend;
 
     auto& ncnn_cfg = bootstrap.processor_config.detector.ncnn;
@@ -294,8 +311,8 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     hailo_cfg.hef_path = options.hef_path.empty() ? default_paths.hef_path : options.hef_path;
     hailo_cfg.metadata_path = options.metadata_path.empty() ? default_paths.metadata_path : options.metadata_path;
 
-    // ── ROI / runtime 설정 (기존과 동일) ─────────────────────
-    bootstrap.processor_config.roi_enabled = true;
+    // ── ROI / runtime 설정 ──────────────────────────────────
+    bootstrap.processor_config.roi_enabled = loaded_roi_config.loaded;
     bootstrap.processor_config.roi_config_path = loaded_roi_config.path;
     bootstrap.processor_config.roi_config = loaded_roi_config.config;
     bootstrap.processor_config.roi_alert_gpio.enabled = options.roi_alert_gpio >= 0;
@@ -313,10 +330,10 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     bootstrap.websocket_publisher_config.port = options.websocket_port;
     bootstrap.http_roi_server_config.port = options.http_port;
 
-    if (options.detector_backend == catcheye::DetectorBackend::Ncnn && (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty())) {
+    if (!options.viewer_only && options.detector_backend == catcheye::DetectorBackend::Ncnn && (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty())) {
         throw std::runtime_error("NCNN model paths are required");
     }
-    if (options.detector_backend == catcheye::DetectorBackend::Hailo && hailo_cfg.hef_path.empty()) {
+    if (!options.viewer_only && options.detector_backend == catcheye::DetectorBackend::Hailo && hailo_cfg.hef_path.empty()) {
         throw std::runtime_error("Hailo HEF path is required; pass --hef <model.hef>");
     }
 
@@ -328,16 +345,26 @@ int run_app(int argc, char** argv) {
     const AppOptions options = parse_app_options(argc, argv);
     const DefaultPaths default_paths = resolve_default_paths(argv[0]);
     const std::string roi_config_path = options.positional_args.size() > 3 ? options.positional_args[3] : default_paths.roi_config_path;
-    const LoadedRoiConfig loaded_roi_config = load_and_validate_roi_config(roi_config_path);
+    const LoadedRoiConfig loaded_roi_config = options.viewer_only ? LoadedRoiConfig{} : load_and_validate_roi_config(roi_config_path);
     AppBootstrap bootstrap = build_app_bootstrap(options, default_paths, loaded_roi_config);
 
     if (const auto log = logger()) {
-        log->info("catcheye-guard starting (mode='{}', ROI='{}', publisher='{}', http_port={})",
-                  describe_runtime_mode(options),
-                  bootstrap.processor_config.roi_config_path,
-                  publisher_name(bootstrap.publisher_type),
-                  bootstrap.http_roi_server_config.port);
-        log->info("detector backend: {}", detector_backend_name(bootstrap.processor_config.detector.backend));
+        if (options.viewer_only) {
+            log->info("catcheye-guard starting (mode='{}', publisher='{}')",
+                      describe_runtime_mode(options),
+                      publisher_name(bootstrap.publisher_type));
+        } else {
+            log->info("catcheye-guard starting (mode='{}', ROI='{}', publisher='{}', http_port={})",
+                      describe_runtime_mode(options),
+                      bootstrap.processor_config.roi_config_path,
+                      publisher_name(bootstrap.publisher_type),
+                      bootstrap.http_roi_server_config.port);
+        }
+        if (bootstrap.processor_config.detection_enabled) {
+            log->info("detector backend: {}", detector_backend_name(bootstrap.processor_config.detector.backend));
+        } else {
+            log->info("detector disabled: viewer-only mode");
+        }
         if (bootstrap.processor_config.roi_alert_gpio.enabled) {
             log->info("ROI alert GPIO enabled: chip='{}', line={}, pulse_ms={}, active_low={}",
                       bootstrap.processor_config.roi_alert_gpio.chip_path,
@@ -357,18 +384,23 @@ int run_app(int argc, char** argv) {
     const std::string http_roi_config_path = bootstrap.processor_config.roi_config_path;
     auto processor = std::make_unique<catcheye::GuardProcessor>(std::move(bootstrap.processor_config));
     auto* processor_ptr = processor.get();
-    HttpRoiServer roi_server(
-        bootstrap.http_roi_server_config,
-        http_roi_config_path,
-        processor_ptr);
-    if (!roi_server.start()) {
-        throw std::runtime_error("failed to start ROI HTTP API server");
+    std::unique_ptr<HttpRoiServer> roi_server;
+    if (!options.viewer_only) {
+        roi_server = std::make_unique<HttpRoiServer>(
+            bootstrap.http_roi_server_config,
+            http_roi_config_path,
+            processor_ptr);
+        if (!roi_server->start()) {
+            throw std::runtime_error("failed to start ROI HTTP API server");
+        }
     }
 
     catcheye::runtime::FrameProcessingRunner runner(std::move(bootstrap.runtime_config), std::move(bootstrap.source), std::move(processor),
                                                     std::move(publisher));
     const int exit_code = runner.run();
-    roi_server.stop();
+    if (roi_server) {
+        roi_server->stop();
+    }
     return exit_code;
 }
 

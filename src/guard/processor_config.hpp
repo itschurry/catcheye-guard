@@ -10,6 +10,7 @@
 namespace catcheye {
 
 struct GuardProcessorConfig {
+    bool detection_enabled = true;
     DetectorFactoryConfig detector;
 
     // ── 클래스 필터 ──────────────────────────────────────────

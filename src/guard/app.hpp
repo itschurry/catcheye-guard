@@ -30,6 +30,7 @@ struct AppOptions {
     int roi_alert_gpio = 14;
     int roi_alert_pulse_ms = 100;
     bool roi_alert_active_low = false;
+    bool viewer_only = false;
     std::string gpio_chip_path = "/dev/gpiochip4";
     catcheye::DetectorBackend detector_backend = catcheye::DetectorBackend::Ncnn;
     std::string hef_path;
@@ -46,6 +47,7 @@ struct DefaultPaths {
 };
 
 struct LoadedRoiConfig {
+    bool loaded = false;
     std::string path;
     catcheye::roi::CameraRoiConfig config;
 };

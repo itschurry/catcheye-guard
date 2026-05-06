@@ -320,6 +320,7 @@ cd /opt/catcheye-guard
 
 - `--rtsp [port]`: RTSP 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
 - `--ws [port]`: WebSocket 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
+- `--viewer-only`: 검출 없이 카메라 프레임만 송출한다. `--camera` 와 `--rtsp` 또는 `--ws` 가 필요하다.
 - `--detector <ncnn|hailo>`: detector 백엔드를 선택한다. 기본값은 `ncnn` 이다.
 - `--hef <path>`: Hailo 백엔드에서 사용할 HEF 모델 경로를 지정한다.
 - `--metadata <path>`: 클래스 이름 메타데이터 YAML 경로를 지정한다.
@@ -347,6 +348,8 @@ cd /opt/catcheye-guard
 - `--camera-width`, `--camera-height` 는 짝수 양수여야 한다.
 - `--roi-alert-gpio` 는 `-1` 또는 0 이상의 GPIO line 번호여야 한다.
 - `--roi-alert-pulse-ms` 는 0 이상의 값이어야 한다.
+- `--viewer-only` 는 `--camera` 와 `--rtsp` 또는 `--ws` 와 같이 써야 한다.
+- `--viewer-only` 에서는 모델, 메타데이터, ROI 경로 인자를 쓰지 않는다.
 - Hailo 백엔드는 빌드 시 `-DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON` 이 필요하다.
 - Hailo 백엔드를 실행하려면 Raspberry Pi에 HailoRT와 PCIe 드라이버가 설치되어 있어야 한다.
 - `--headless` 는 더 이상 지원하지 않는다.
@@ -361,6 +364,7 @@ cd /opt/catcheye-guard
 - `--image`, `--video` 는 항상 `gstreamer` 입력이다.
 - `--rtsp` 는 입력 소스를 바꾸지 않고 출력만 RTSP 송출로 바꾼다.
 - `--ws` 는 입력 소스를 바꾸지 않고 출력만 WebSocket 송출로 바꾼다.
+- `--viewer-only` 는 detector, ROI HTTP API, ROI GPIO 알림을 시작하지 않는다.
 
 WebSocket 송출 형식:
 
@@ -374,7 +378,7 @@ WebSocket 송출 형식:
 권장 CSI GStreamer 입력 파이프라인:
 
 ```bash
-libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert
+libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180
 ```
 
 참고:
@@ -394,19 +398,19 @@ CSI 카메라 + `libcamera` 소스:
 CSI 카메라 + `gstreamer` 소스 + RTSP 송출:
 
 ```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip video-direction=vert" --rtsp 8554
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip method=rotate-180" --rtsp 8554
 ```
 
 CSI 카메라 + `gstreamer` 소스 + WebSocket 송출:
 
 ```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector ncnn
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector ncnn
 ```
 
 CSI 카메라 + `gstreamer` 소스 + WebSocket 송출 + Hailo 백엔드:
 
 ```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
 ```
 
 USB 카메라 + `gstreamer` 소스:
@@ -478,7 +482,7 @@ USB 카메라 + `gstreamer` 소스 + WebSocket 송출:
 Hailo HEF 모델을 쓰는 예시:
 
 ```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip video-direction=vert" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
 ```
 
 ## 문제 생기면 확인

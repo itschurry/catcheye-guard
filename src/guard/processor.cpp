@@ -79,6 +79,10 @@ std::string build_metadata_json(const std::vector<EvaluatedDetection>& detection
     return oss.str();
 }
 
+std::string build_viewer_metadata_json() {
+    return "{\"viewer_only\":true,\"detection_count\":0,\"detections\":[]}";
+}
+
 cv::Mat frame_to_bgr_mat(const catcheye::input::Frame& frame) {
     if (frame.empty() || frame.width <= 0 || frame.height <= 0 || frame.stride <= 0) {
         return {};
@@ -156,11 +160,27 @@ bool build_annotated_publish_frame(const catcheye::input::Frame& source_frame,
     return true;
 }
 
+bool build_viewer_publish_frame(const catcheye::input::Frame& source_frame,
+                                catcheye::input::Frame& output_frame) {
+    cv::Mat bgr = frame_to_bgr_mat(source_frame);
+    if (bgr.empty()) {
+        return false;
+    }
+
+    output_frame.data.assign(bgr.datastart, bgr.dataend);
+    output_frame.width = bgr.cols;
+    output_frame.height = bgr.rows;
+    output_frame.stride = static_cast<int>(bgr.step);
+    output_frame.format = catcheye::input::PixelFormat::BGR;
+    output_frame.timestamp = source_frame.timestamp;
+    return true;
+}
+
 } // namespace
 
 GuardProcessor::GuardProcessor(GuardProcessorConfig config)
     : config_(std::move(config)),
-      detector_(create_detector(config_.detector)),
+      detector_(config_.detection_enabled ? create_detector(config_.detector) : nullptr),
       roi_alert_signal_(std::make_unique<catcheye::hardware::GpioPulseSignal>(config_.roi_alert_gpio))
 {
     if (const auto log = logger()) {
@@ -191,14 +211,14 @@ bool GuardProcessor::initialize() {
         }
     }
 
-    if (!detector_->initialize()) {
+    if (config_.detection_enabled && !detector_->initialize()) {
         if (const auto log = logger()) {
             log->error("failed to initialize detector");
         }
         return false;
     }
 
-    if (!roi_alert_signal_->initialize()) {
+    if (config_.detection_enabled && !roi_alert_signal_->initialize()) {
         if (const auto log = logger()) {
             log->error("failed to initialize ROI alert GPIO signal");
         }
@@ -234,6 +254,21 @@ bool GuardProcessor::update_roi_config(const catcheye::roi::CameraRoiConfig& roi
 
 catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::Frame& frame,
                                                          const catcheye::runtime::ProcessContext& context) {
+    if (!config_.detection_enabled) {
+        catcheye::runtime::ProcessOutput output;
+        if (!context.needs_publish) {
+            return output;
+        }
+
+        output.has_message = true;
+        output.message.stream_name = "camera-viewer";
+        output.message.metadata_json = build_viewer_metadata_json();
+        if (build_viewer_publish_frame(frame, output.publish_frame)) {
+            output.has_publish_frame = true;
+        }
+        return output;
+    }
+
     if (context.should_process) {
         cached_detections_ = detector_->detect(frame);
     }
