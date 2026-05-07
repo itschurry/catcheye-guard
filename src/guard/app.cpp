@@ -55,6 +55,27 @@ std::string resolve_default_model_path(const char* executable_path, const std::s
     return (fs::current_path() / "models" / relative_path).lexically_normal().string();
 }
 
+std::string resolve_default_config_path(const char* executable_path, const std::string& relative_path) {
+    namespace fs = std::filesystem;
+
+    std::vector<fs::path> candidates;
+    if (executable_path != nullptr && *executable_path != '\0') {
+        const fs::path executable = fs::absolute(executable_path);
+        const fs::path executable_dir = executable.parent_path();
+        candidates.emplace_back(executable_dir / ".." / "config" / relative_path);
+        candidates.emplace_back(executable_dir / "config" / relative_path);
+    }
+    candidates.emplace_back(fs::current_path() / "config" / relative_path);
+
+    for (const fs::path& candidate : candidates) {
+        if (fs::exists(candidate)) {
+            return candidate.lexically_normal().string();
+        }
+    }
+
+    return (fs::current_path() / "config" / relative_path).lexically_normal().string();
+}
+
 bool is_input_mode(const std::string& arg) {
     return arg == "--image" || arg == "--video" || arg == "--camera";
 }
@@ -279,8 +300,8 @@ DefaultPaths resolve_default_paths(const char* executable_path) {
         .bin_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/model.ncnn.bin"),
         .metadata_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/metadata.yaml"),
         .hef_path = {},
-        .roi_config_path = resolve_default_model_path(executable_path, "roi_cam_default.json"),
-        .pallet_roi_config_path = resolve_default_model_path(executable_path, "pallet_roi_cam_default.json"),
+        .roi_config_path = resolve_default_config_path(executable_path, "roi_cam_default.json"),
+        .pallet_roi_config_path = resolve_default_config_path(executable_path, "pallet_roi_cam_default.json"),
     };
 }
 
