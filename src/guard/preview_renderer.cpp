@@ -52,7 +52,7 @@ cv::Scalar detection_color(const EvaluatedDetection& detection, bool roi_enabled
 
 void draw_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_config, cv::Scalar enabled_color, cv::Scalar disabled_color) {
     for (const bool draw_enabled : {true, false}) {
-        const double fill_alpha = draw_enabled ? 0.45 : 0.25;
+        const double fill_alpha = draw_enabled ? 0.18 : 0.10;
         cv::Mat fill_overlay;
         bool any_zone_drawn = false;
 
