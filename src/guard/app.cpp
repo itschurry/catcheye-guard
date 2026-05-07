@@ -190,11 +190,16 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.hef_path = args[++i];
         } else if (arg == "--metadata" && i + 1 < args.size()) {
             options.metadata_path = args[++i];
+        } else if (arg == "--pallet-roi" && i + 1 < args.size()) {
+            options.pallet_roi_config_path = args[++i];
+        } else if (arg == "--pallet-class-id" && i + 1 < args.size()) {
+            options.pallet_class_id = std::stoi(args[++i]);
         } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" ||
                    arg == "--camera-device" || arg == "--ws" ||
                    arg == "--camera-width" || arg == "--camera-height" || arg == "--num-threads" ||
                    arg == "--http-port" || arg == "--roi-alert-gpio" || arg == "--roi-alert-pulse-ms" ||
-                   arg == "--gpio-chip" || arg == "--detector" || arg == "--hef" || arg == "--metadata") {
+                   arg == "--gpio-chip" || arg == "--detector" || arg == "--hef" || arg == "--metadata" ||
+                   arg == "--pallet-roi" || arg == "--pallet-class-id") {
             throw std::runtime_error("missing value for flag: " + arg);
         } else if (is_input_mode(arg)) {
             throw std::runtime_error("input mode flags are mutually exclusive");
@@ -236,6 +241,9 @@ AppOptions parse_app_options(int argc, char** argv) {
     if (options.roi_alert_pulse_ms < 0) {
         throw std::runtime_error("ROI alert pulse must be zero or a positive integer");
     }
+    if (options.pallet_class_id < 0) {
+        throw std::runtime_error("pallet class id must be a non-negative integer");
+    }
 
     if ((options.input.camera_width % 2) != 0 || (options.input.camera_height % 2) != 0) {
         throw std::runtime_error("camera dimensions must be even for NV12/RTSP output");
@@ -250,6 +258,9 @@ AppOptions parse_app_options(int argc, char** argv) {
         }
         if (!options.hef_path.empty() || !options.metadata_path.empty() || !options.positional_args.empty()) {
             throw std::runtime_error("model, metadata, and ROI path arguments are not used with --viewer-only");
+        }
+        if (!options.pallet_roi_config_path.empty()) {
+            throw std::runtime_error("pallet ROI path is not used with --viewer-only");
         }
     }
 
@@ -269,6 +280,7 @@ DefaultPaths resolve_default_paths(const char* executable_path) {
         .metadata_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/metadata.yaml"),
         .hef_path = {},
         .roi_config_path = resolve_default_model_path(executable_path, "roi_cam_default.json"),
+        .pallet_roi_config_path = resolve_default_model_path(executable_path, "pallet_roi_cam_default.json"),
     };
 }
 
@@ -290,7 +302,11 @@ LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path)
     };
 }
 
-AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& default_paths, const LoadedRoiConfig& loaded_roi_config) {
+AppBootstrap build_app_bootstrap(
+    const AppOptions& options,
+    const DefaultPaths& default_paths,
+    const LoadedRoiConfig& loaded_roi_config,
+    const LoadedRoiConfig& loaded_pallet_roi_config) {
     AppBootstrap bootstrap;
 
     bootstrap.processor_config.detection_enabled = !options.viewer_only;
@@ -301,6 +317,7 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     ncnn_cfg.bin_path = default_paths.bin_path;
     ncnn_cfg.metadata_path = options.metadata_path.empty() ? default_paths.metadata_path : options.metadata_path;
     ncnn_cfg.num_threads = options.num_threads;
+    ncnn_cfg.allowed_class_ids = {0, options.pallet_class_id};
 
     // positional args override (기존 동작 유지)
     if (!options.positional_args.empty()) ncnn_cfg.param_path = options.positional_args[0];
@@ -310,11 +327,17 @@ AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& 
     auto& hailo_cfg = bootstrap.processor_config.detector.hailo;
     hailo_cfg.hef_path = options.hef_path.empty() ? default_paths.hef_path : options.hef_path;
     hailo_cfg.metadata_path = options.metadata_path.empty() ? default_paths.metadata_path : options.metadata_path;
+    hailo_cfg.allowed_class_ids = {0, options.pallet_class_id};
 
     // ── ROI / runtime 설정 ──────────────────────────────────
     bootstrap.processor_config.roi_enabled = loaded_roi_config.loaded;
     bootstrap.processor_config.roi_config_path = loaded_roi_config.path;
     bootstrap.processor_config.roi_config = loaded_roi_config.config;
+    bootstrap.processor_config.pallet_detection_enabled = !options.viewer_only;
+    bootstrap.processor_config.pallet_class_id = options.pallet_class_id;
+    bootstrap.processor_config.pallet_roi_enabled = loaded_pallet_roi_config.loaded;
+    bootstrap.processor_config.pallet_roi_config_path = loaded_pallet_roi_config.path;
+    bootstrap.processor_config.pallet_roi_config = loaded_pallet_roi_config.config;
     bootstrap.processor_config.roi_alert_gpio.enabled = options.roi_alert_gpio >= 0;
     bootstrap.processor_config.roi_alert_gpio.chip_path = options.gpio_chip_path;
     bootstrap.processor_config.roi_alert_gpio.line = options.roi_alert_gpio;
@@ -345,8 +368,12 @@ int run_app(int argc, char** argv) {
     const AppOptions options = parse_app_options(argc, argv);
     const DefaultPaths default_paths = resolve_default_paths(argv[0]);
     const std::string roi_config_path = options.positional_args.size() > 3 ? options.positional_args[3] : default_paths.roi_config_path;
+    const std::string pallet_roi_config_path =
+        options.pallet_roi_config_path.empty() ? default_paths.pallet_roi_config_path : options.pallet_roi_config_path;
     const LoadedRoiConfig loaded_roi_config = options.viewer_only ? LoadedRoiConfig{} : load_and_validate_roi_config(roi_config_path);
-    AppBootstrap bootstrap = build_app_bootstrap(options, default_paths, loaded_roi_config);
+    const LoadedRoiConfig loaded_pallet_roi_config =
+        options.viewer_only ? LoadedRoiConfig{} : load_and_validate_roi_config(pallet_roi_config_path);
+    AppBootstrap bootstrap = build_app_bootstrap(options, default_paths, loaded_roi_config, loaded_pallet_roi_config);
 
     if (const auto log = logger()) {
         if (options.viewer_only) {
@@ -354,9 +381,10 @@ int run_app(int argc, char** argv) {
                       describe_runtime_mode(options),
                       publisher_name(bootstrap.publisher_type));
         } else {
-            log->info("catcheye-guard starting (mode='{}', ROI='{}', publisher='{}', http_port={})",
+            log->info("catcheye-guard starting (mode='{}', ROI='{}', pallet_ROI='{}', publisher='{}', http_port={})",
                       describe_runtime_mode(options),
                       bootstrap.processor_config.roi_config_path,
+                      bootstrap.processor_config.pallet_roi_config_path,
                       publisher_name(bootstrap.publisher_type),
                       bootstrap.http_roi_server_config.port);
         }
@@ -382,6 +410,7 @@ int run_app(int argc, char** argv) {
     }
 
     const std::string http_roi_config_path = bootstrap.processor_config.roi_config_path;
+    const std::string http_pallet_roi_config_path = bootstrap.processor_config.pallet_roi_config_path;
     auto processor = std::make_unique<catcheye::GuardProcessor>(std::move(bootstrap.processor_config));
     auto* processor_ptr = processor.get();
     std::unique_ptr<HttpRoiServer> roi_server;
@@ -389,6 +418,7 @@ int run_app(int argc, char** argv) {
         roi_server = std::make_unique<HttpRoiServer>(
             bootstrap.http_roi_server_config,
             http_roi_config_path,
+            http_pallet_roi_config_path,
             processor_ptr);
         if (!roi_server->start()) {
             throw std::runtime_error("failed to start ROI HTTP API server");

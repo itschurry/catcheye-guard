@@ -60,13 +60,36 @@ std::string escape_json(std::string_view value) {
     return escaped;
 }
 
-std::string build_metadata_json(const std::vector<EvaluatedDetection>& detections, const IDetector& detector, bool roi_enabled, double inference_ms) {
+std::string build_metadata_json(const std::vector<EvaluatedDetection>& detections,
+                                const std::vector<PalletEvaluation>& pallets,
+                                const IDetector& detector,
+                                bool roi_enabled,
+                                bool pallet_detection_enabled,
+                                bool pallet_present,
+                                double inference_ms) {
     std::ostringstream oss;
     oss << "{\"roi_enabled\":" << (roi_enabled ? "true" : "false") << ",\"detection_count\":" << detections.size()
-        << ",\"inference_ms\":" << inference_ms << ",\"detections\":[";
+        << ",\"inference_ms\":" << inference_ms
+        << ",\"pallet_detection_enabled\":" << (pallet_detection_enabled ? "true" : "false")
+        << ",\"pallet_present\":" << (pallet_present ? "true" : "false")
+        << ",\"pallet_count\":" << pallets.size()
+        << ",\"detections\":[";
 
     for (std::size_t i = 0; i < detections.size(); ++i) {
         const auto& item = detections[i];
+        if (i > 0) {
+            oss << ',';
+        }
+        oss << "{" << "\"class_id\":" << item.detection.class_id << ",\"class_name\":\""
+            << escape_json(detector.class_name(item.detection.class_id)) << "\"" << ",\"score\":" << item.detection.score << ",\"bbox\":{"
+            << "\"x\":" << item.detection.box.x << ",\"y\":" << item.detection.box.y << ",\"width\":" << item.detection.box.width
+            << ",\"height\":" << item.detection.box.height << "}" << ",\"roi_status\":\"" << roi_status_to_string(item.roi_result.status)
+            << "\"" << ",\"roi_reason\":\"" << escape_json(item.roi_result.reason) << "\"" << "}";
+    }
+
+    oss << "],\"pallets\":[";
+    for (std::size_t i = 0; i < pallets.size(); ++i) {
+        const auto& item = pallets[i];
         if (i > 0) {
             oss << ',';
         }
@@ -140,6 +163,7 @@ cv::Mat frame_to_bgr_mat(const catcheye::input::Frame& frame) {
 
 bool build_annotated_publish_frame(const catcheye::input::Frame& source_frame,
                                    const std::vector<EvaluatedDetection>& detections,
+                                   const std::vector<PalletEvaluation>& pallets,
                                    const IDetector& detector,
                                    const GuardProcessorConfig& config,
                                    catcheye::input::Frame& output_frame) {
@@ -151,7 +175,11 @@ bool build_annotated_publish_frame(const catcheye::input::Frame& source_frame,
     if (config.roi_enabled) {
         draw_roi_zones(bgr, config.roi_config);
     }
+    if (config.pallet_roi_enabled) {
+        draw_pallet_roi_zones(bgr, config.pallet_roi_config);
+    }
     draw_detections(bgr, detections, detector, config.roi_enabled);
+    draw_pallet_detections(bgr, pallets);
 
     output_frame.data.assign(bgr.datastart, bgr.dataend);
     output_frame.width = bgr.cols;
@@ -198,6 +226,14 @@ GuardProcessor::RoiSnapshot GuardProcessor::roi_snapshot() const {
     };
 }
 
+GuardProcessor::RoiSnapshot GuardProcessor::pallet_roi_snapshot() const {
+    std::lock_guard<std::mutex> lock(roi_mutex_);
+    return {
+        .enabled = config_.pallet_roi_enabled,
+        .config = config_.pallet_roi_config,
+    };
+}
+
 bool GuardProcessor::initialize() {
     const RoiSnapshot roi = roi_snapshot();
     if (roi.enabled) {
@@ -207,6 +243,26 @@ bool GuardProcessor::initialize() {
                 log->error("ROI config invalid: {} issue(s)", validation.issues.size());
                 for (const auto& issue : validation.issues) {
                     log->error("ROI issue: zone={}, point={}, msg={}", issue.zone_index, issue.point_index, issue.message);
+                }
+            }
+            return false;
+        }
+    }
+    const RoiSnapshot pallet_roi = pallet_roi_snapshot();
+    if (config_.pallet_detection_enabled) {
+        if (!pallet_roi.enabled) {
+            if (const auto log = logger()) {
+                log->error("pallet ROI config is required");
+            }
+            return false;
+        }
+
+        const auto validation = catcheye::roi::validate_camera_roi_config(pallet_roi.config);
+        if (!validation.valid) {
+            if (const auto log = logger()) {
+                log->error("pallet ROI config invalid: {} issue(s)", validation.issues.size());
+                for (const auto& issue : validation.issues) {
+                    log->error("pallet ROI issue: zone={}, point={}, msg={}", issue.zone_index, issue.point_index, issue.message);
                 }
             }
             return false;
@@ -254,6 +310,30 @@ bool GuardProcessor::update_roi_config(const catcheye::roi::CameraRoiConfig& roi
     return true;
 }
 
+bool GuardProcessor::update_pallet_roi_config(const catcheye::roi::CameraRoiConfig& roi_config) {
+    const auto validation = catcheye::roi::validate_camera_roi_config(roi_config);
+    if (!validation.valid) {
+        if (const auto log = logger()) {
+            log->warn("refusing invalid pallet ROI config update: {} issue(s)", validation.issues.size());
+        }
+        return false;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(roi_mutex_);
+        config_.pallet_roi_enabled = true;
+        config_.pallet_roi_config = roi_config;
+    }
+
+    if (const auto log = logger()) {
+        log->info(
+            "pallet ROI config updated in memory: camera_id='{}', zones={}",
+            roi_config.camera_id,
+            roi_config.allowed_zones.size());
+    }
+    return true;
+}
+
 catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::Frame& frame,
                                                          const catcheye::runtime::ProcessContext& context) {
     if (!config_.detection_enabled) {
@@ -280,11 +360,19 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
     }
 
     const RoiSnapshot roi = roi_snapshot();
+    const RoiSnapshot pallet_roi = pallet_roi_snapshot();
     const std::vector<Detection> visible_detections =
         filter_detections(cached_detections_, config_.filter_by_class, config_.filter_class_id);
     const std::vector<EvaluatedDetection> evaluated_detections =
         evaluate_detections(visible_detections, roi.enabled, roi.config);
+    const std::vector<Detection> pallet_detections =
+        filter_detections(cached_detections_, config_.pallet_detection_enabled, config_.pallet_class_id);
+    const std::vector<PalletEvaluation> evaluated_pallets =
+        config_.pallet_detection_enabled
+            ? evaluate_pallet_detections(pallet_detections, pallet_roi.enabled, pallet_roi.config)
+            : std::vector<PalletEvaluation>{};
     bool has_roi_violation = false;
+    bool pallet_present = !config_.pallet_detection_enabled;
 
     if (roi.enabled) {
         for (const EvaluatedDetection& ed : evaluated_detections) {
@@ -312,17 +400,30 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
         }
     }
 
-    if (roi_violation_active_ != has_roi_violation) {
-        roi_alert_signal_->set_state(has_roi_violation);
+    if (config_.pallet_detection_enabled) {
+        for (const PalletEvaluation& pallet : evaluated_pallets) {
+            if (pallet.present) {
+                pallet_present = true;
+                break;
+            }
+        }
+    }
+
+    const bool alert_active = has_roi_violation || (config_.pallet_detection_enabled && !pallet_present);
+    if (roi_violation_active_ != alert_active) {
+        roi_alert_signal_->set_state(alert_active);
         if (const auto log = logger()) {
-            if (has_roi_violation) {
-                log->info("ROI alert GPIO ON at frame={}", context.frame_index);
+            if (alert_active) {
+                log->info("ROI alert GPIO ON at frame={} (person_roi_violation={}, pallet_present={})",
+                          context.frame_index,
+                          has_roi_violation,
+                          pallet_present);
             } else {
                 log->info("ROI alert GPIO OFF at frame={}", context.frame_index);
             }
         }
     }
-    roi_violation_active_ = has_roi_violation;
+    roi_violation_active_ = alert_active;
 
     catcheye::runtime::ProcessOutput output;
     if (!context.needs_publish) {
@@ -331,12 +432,21 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
 
     output.has_message = true;
     output.message.stream_name = "person-guard";
-    output.message.metadata_json = build_metadata_json(evaluated_detections, *detector_, roi.enabled, cached_inference_ms_);
+    output.message.metadata_json = build_metadata_json(
+        evaluated_detections,
+        evaluated_pallets,
+        *detector_,
+        roi.enabled,
+        config_.pallet_detection_enabled,
+        pallet_present,
+        cached_inference_ms_);
 
     GuardProcessorConfig publish_config;
     publish_config.roi_enabled = roi.enabled;
     publish_config.roi_config = roi.config;
-    if (build_annotated_publish_frame(frame, evaluated_detections, *detector_, publish_config, output.publish_frame)) {
+    publish_config.pallet_roi_enabled = pallet_roi.enabled;
+    publish_config.pallet_roi_config = pallet_roi.config;
+    if (build_annotated_publish_frame(frame, evaluated_detections, evaluated_pallets, *detector_, publish_config, output.publish_frame)) {
         output.has_publish_frame = true;
     }
     return output;

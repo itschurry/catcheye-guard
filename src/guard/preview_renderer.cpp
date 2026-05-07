@@ -13,6 +13,9 @@ namespace {
 using RoiEvaluationStatus = catcheye::roi::EvaluationStatus;
 const cv::Scalar kEnabledRoiColor(0, 215, 255);
 const cv::Scalar kDisabledRoiColor(128, 128, 128);
+const cv::Scalar kPalletRoiColor(255, 255, 255);
+const cv::Scalar kPalletPresentColor(128, 128, 128);
+const cv::Scalar kPalletOutsideColor(255, 0, 255);
 
 cv::Rect to_rect(const BoundingBox& box) {
     return cv::Rect(
@@ -47,7 +50,7 @@ cv::Scalar detection_color(const EvaluatedDetection& detection, bool roi_enabled
 
 } // namespace
 
-void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_config) {
+void draw_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_config, cv::Scalar enabled_color, cv::Scalar disabled_color) {
     for (const bool draw_enabled : {true, false}) {
         const double fill_alpha = draw_enabled ? 0.20 : 0.10;
         cv::Mat fill_overlay;
@@ -66,7 +69,7 @@ void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_co
             for (const auto& point : zone.points) {
                 polygon.push_back(to_cv_point(point));
             }
-            const cv::Scalar color = draw_enabled ? kEnabledRoiColor : kDisabledRoiColor;
+            const cv::Scalar color = draw_enabled ? enabled_color : disabled_color;
             const std::vector<std::vector<cv::Point>> polygons {polygon};
             cv::fillPoly(fill_overlay, polygons, color, cv::LINE_AA);
         }
@@ -87,7 +90,7 @@ void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_co
             polygon.push_back(to_cv_point(point));
         }
 
-        const cv::Scalar color = zone.enabled ? kEnabledRoiColor : kDisabledRoiColor;
+        const cv::Scalar color = zone.enabled ? enabled_color : disabled_color;
         const int thickness = zone.enabled ? 2 : 1;
 
         cv::polylines(image, polygon, true, color, thickness, cv::LINE_AA);
@@ -106,6 +109,14 @@ void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_co
     }
 }
 
+void draw_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_config) {
+    draw_zones(image, roi_config, kEnabledRoiColor, kDisabledRoiColor);
+}
+
+void draw_pallet_roi_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_config) {
+    draw_zones(image, roi_config, kPalletRoiColor, kDisabledRoiColor);
+}
+
 void draw_detections(
     cv::Mat& image,
     const std::vector<EvaluatedDetection>& detections,
@@ -116,6 +127,14 @@ void draw_detections(
     for (const EvaluatedDetection& evaluated_detection : detections) {
         const cv::Rect box = to_rect(evaluated_detection.detection.box);
         const cv::Scalar color = detection_color(evaluated_detection, roi_enabled);
+        cv::rectangle(image, box, color, 2);
+    }
+}
+
+void draw_pallet_detections(cv::Mat& image, const std::vector<PalletEvaluation>& detections) {
+    for (const PalletEvaluation& detection : detections) {
+        const cv::Rect box = to_rect(detection.detection.box);
+        const cv::Scalar color = detection.present ? kPalletPresentColor : kPalletOutsideColor;
         cv::rectangle(image, box, color, 2);
     }
 }

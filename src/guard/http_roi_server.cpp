@@ -211,8 +211,11 @@ bool read_http_request(int client_fd, std::string& request, std::string& body) {
 
 } // namespace
 
-HttpRoiServer::HttpRoiServer(HttpRoiServerConfig config, std::string roi_config_path, GuardProcessor* processor)
-    : config_(std::move(config)), roi_config_path_(std::move(roi_config_path)), processor_(processor) {}
+HttpRoiServer::HttpRoiServer(HttpRoiServerConfig config, std::string roi_config_path, std::string pallet_roi_config_path, GuardProcessor* processor)
+    : config_(std::move(config)),
+      roi_config_path_(std::move(roi_config_path)),
+      pallet_roi_config_path_(std::move(pallet_roi_config_path)),
+      processor_(processor) {}
 
 HttpRoiServer::~HttpRoiServer() {
     stop();
@@ -316,18 +319,23 @@ void HttpRoiServer::handle_client(int client_fd) {
         return;
     }
 
-    if (path != "/api/roi") {
+    RoiConfigKind kind = RoiConfigKind::Person;
+    if (path == "/api/roi") {
+        kind = RoiConfigKind::Person;
+    } else if (path == "/api/pallet-roi") {
+        kind = RoiConfigKind::Pallet;
+    } else {
         send_response(client_fd, 404, "Not Found", json_error_body("unknown endpoint"));
         return;
     }
 
     if (method == "GET") {
-        handle_get_roi(client_fd);
+        handle_get_roi(client_fd, kind);
         return;
     }
 
     if (method == "PUT") {
-        handle_put_roi(client_fd, body);
+        handle_put_roi(client_fd, body, kind);
         return;
     }
 
@@ -345,8 +353,12 @@ bool HttpRoiServer::send_response(int client_fd, int status_code, const std::str
     return send_all(client_fd, response.data(), response.size());
 }
 
-bool HttpRoiServer::handle_get_roi(int client_fd) {
-    const auto parse_result = catcheye::roi::RoiRepository::load_from_file(roi_config_path_);
+const std::string& HttpRoiServer::roi_config_path(RoiConfigKind kind) const {
+    return kind == RoiConfigKind::Pallet ? pallet_roi_config_path_ : roi_config_path_;
+}
+
+bool HttpRoiServer::handle_get_roi(int client_fd, RoiConfigKind kind) {
+    const auto parse_result = catcheye::roi::RoiRepository::load_from_file(roi_config_path(kind));
     if (!parse_result.success) {
         return send_response(
             client_fd,
@@ -371,7 +383,7 @@ bool HttpRoiServer::handle_get_roi(int client_fd) {
         catcheye::roi::RoiRepository::to_json_string(parse_result.config, 2));
 }
 
-bool HttpRoiServer::handle_put_roi(int client_fd, const std::string& body) {
+bool HttpRoiServer::handle_put_roi(int client_fd, const std::string& body, RoiConfigKind kind) {
     const auto parse_result = catcheye::roi::RoiRepository::from_json_string(body);
     if (!parse_result.success) {
         return send_response(
@@ -390,11 +402,14 @@ bool HttpRoiServer::handle_put_roi(int client_fd, const std::string& body) {
             json_error_body("ROI config failed validation", validation_issue_messages(validation)));
     }
 
-    if (!catcheye::roi::RoiRepository::save_to_file(parse_result.config, roi_config_path_)) {
+    if (!catcheye::roi::RoiRepository::save_to_file(parse_result.config, roi_config_path(kind))) {
         return send_response(client_fd, 500, "Internal Server Error", json_error_body("failed to save ROI config file"));
     }
 
-    if (!processor_->update_roi_config(parse_result.config)) {
+    const bool updated = kind == RoiConfigKind::Pallet
+        ? processor_->update_pallet_roi_config(parse_result.config)
+        : processor_->update_roi_config(parse_result.config);
+    if (!updated) {
         return send_response(client_fd, 500, "Internal Server Error", json_error_body("failed to apply ROI config in memory"));
     }
 

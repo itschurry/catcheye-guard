@@ -13,12 +13,23 @@ struct EvaluatedDetection {
     catcheye::roi::EvaluationResult roi_result;
 };
 
+struct PalletEvaluation {
+    Detection detection;
+    catcheye::roi::EvaluationResult roi_result;
+    bool present = false;
+};
+
 std::vector<Detection> filter_detections(
     const std::vector<Detection>& detections,
     bool enabled,
     int class_id);
 
 std::vector<EvaluatedDetection> evaluate_detections(
+    const std::vector<Detection>& detections,
+    bool roi_enabled,
+    const catcheye::roi::CameraRoiConfig& roi_config);
+
+std::vector<PalletEvaluation> evaluate_pallet_detections(
     const std::vector<Detection>& detections,
     bool roi_enabled,
     const catcheye::roi::CameraRoiConfig& roi_config);

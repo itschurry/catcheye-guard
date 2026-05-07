@@ -31,10 +31,12 @@ struct AppOptions {
     int roi_alert_pulse_ms = 100;
     bool roi_alert_active_low = false;
     bool viewer_only = false;
+    int pallet_class_id = 1;
     std::string gpio_chip_path = "/dev/gpiochip4";
     catcheye::DetectorBackend detector_backend = catcheye::DetectorBackend::Ncnn;
     std::string hef_path;
     std::string metadata_path;
+    std::string pallet_roi_config_path;
     std::vector<std::string> positional_args;
 };
 
@@ -44,6 +46,7 @@ struct DefaultPaths {
     std::string metadata_path;
     std::string hef_path;
     std::string roi_config_path;
+    std::string pallet_roi_config_path;
 };
 
 struct LoadedRoiConfig {
@@ -65,7 +68,11 @@ struct AppBootstrap {
 AppOptions parse_app_options(int argc, char** argv);
 DefaultPaths resolve_default_paths(const char* executable_path);
 LoadedRoiConfig load_and_validate_roi_config(const std::string& roi_config_path);
-AppBootstrap build_app_bootstrap(const AppOptions& options, const DefaultPaths& default_paths, const LoadedRoiConfig& loaded_roi_config);
+AppBootstrap build_app_bootstrap(
+    const AppOptions& options,
+    const DefaultPaths& default_paths,
+    const LoadedRoiConfig& loaded_roi_config,
+    const LoadedRoiConfig& loaded_pallet_roi_config);
 
 int run_app(int argc, char** argv);
 
