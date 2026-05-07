@@ -52,7 +52,7 @@ cv::Scalar detection_color(const EvaluatedDetection& detection, bool roi_enabled
 
 void draw_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_config, cv::Scalar enabled_color, cv::Scalar disabled_color) {
     for (const bool draw_enabled : {true, false}) {
-        const double fill_alpha = draw_enabled ? 0.20 : 0.10;
+        const double fill_alpha = draw_enabled ? 0.45 : 0.25;
         cv::Mat fill_overlay;
         bool any_zone_drawn = false;
 
@@ -76,35 +76,6 @@ void draw_zones(cv::Mat& image, const catcheye::roi::CameraRoiConfig& roi_config
 
         if (any_zone_drawn) {
             cv::addWeighted(fill_overlay, fill_alpha, image, 1.0 - fill_alpha, 0.0, image);
-        }
-    }
-
-    for (const auto& zone : roi_config.allowed_zones) {
-        if (zone.points.size() < 2) {
-            continue;
-        }
-
-        std::vector<cv::Point> polygon;
-        polygon.reserve(zone.points.size());
-        for (const auto& point : zone.points) {
-            polygon.push_back(to_cv_point(point));
-        }
-
-        const cv::Scalar color = zone.enabled ? enabled_color : disabled_color;
-        const int thickness = zone.enabled ? 2 : 1;
-
-        cv::polylines(image, polygon, true, color, thickness, cv::LINE_AA);
-
-        if (!zone.name.empty()) {
-            cv::putText(
-                image,
-                zone.name,
-                polygon.front(),
-                cv::FONT_HERSHEY_SIMPLEX,
-                0.5,
-                color,
-                1,
-                cv::LINE_AA);
         }
     }
 }
