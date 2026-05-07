@@ -342,7 +342,7 @@ cd /opt/catcheye-guard
 - `--viewer-only`: 검출 없이 카메라 프레임만 송출한다. `--camera` 와 `--rtsp` 또는 `--ws` 가 필요하다.
 - `--detector <ncnn|hailo>`: detector 백엔드를 선택한다. 기본값은 `ncnn` 이다.
 - `--hef <path>`: Hailo 백엔드에서 사용할 HEF 모델 경로를 지정한다.
-- `--metadata <path>`: 클래스 이름 메타데이터 YAML 경로를 지정한다.
+- `--metadata <path>`: 클래스 이름 메타데이터 YAML 경로를 지정한다. Hailo HEF 실행에는 필수가 아니다.
 - `--num-threads <n>`: NCNN 추론 스레드 수를 지정한다.
 - `--roi-alert-gpio <line>`: 위험 ROI 진입이 처음 감지될 때 pulse를 보낼 GPIO line 번호를 지정한다. 비활성화하려면 생략하거나 `-1`을 쓴다.
 - `--roi-alert-pulse-ms <ms>`: ROI 알림 GPIO pulse 길이를 밀리초 단위로 지정한다.
@@ -545,7 +545,7 @@ CSI 카메라 + `gstreamer` 소스 + WebSocket 송출:
 CSI 카메라 + `gstreamer` 소스 + WebSocket 송출 + Hailo 백엔드:
 
 ```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector hailo --hef ./models/model.hef
 ```
 
 USB 카메라 + `gstreamer` 소스:
@@ -617,7 +617,7 @@ USB 카메라 + `gstreamer` 소스 + WebSocket 송출:
 Hailo HEF 모델을 쓰는 예시:
 
 ```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector hailo --hef ./models/model.hef --metadata ./models/metadata.yaml
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector hailo --hef ./models/model.hef
 ```
 
 ## 문제 생기면 확인
@@ -685,6 +685,21 @@ const EvaluationResult decision = evaluate_bbox_intersects(
 - ROI 포인트는 원본 이미지 좌표계를 기준으로 해석된다.
 - 비활성화된 영역은 설정에는 유지되지만 평가 시에는 무시된다.
 - 라이브 파이프라인에서는 바운딩 박스가 활성 위험 ROI를 침범하면 알람으로 판단한다.
+
+## HEF 모델 다운로드
+
+Hailo 백엔드용 HEF 모델은 `models` 아래에 받아둔다.
+
+```bash
+mkdir -p models
+wget -O models/yolo26m.hef https://hailo-model-zoo.s3.eu-west-2.amazonaws.com/ModelZoo/Compiled/v2.18.0/hailo8/yolo26m.hef
+```
+
+실행할 때는 받은 파일 경로를 `--hef`에 넘긴다.
+
+```bash
+./bin/catcheye-guard --camera --ws --detector hailo --hef ./models/yolo26m.hef
+```
 
 ## 커밋 메시지 규칙
 
