@@ -1,0 +1,14 @@
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: person
+  1: pallet
+args:
+  batch: 1
+  half: false
+channels: 3
+end2end: false
