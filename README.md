@@ -399,6 +399,118 @@ cd /opt/catcheye-guard
 - 운영 기본은 WebSocket 송출이다. RTSP는 RTSP 클라이언트가 꼭 필요할 때만 선택한다.
 - `--viewer-only` 는 detector, ROI HTTP API, ROI GPIO 알림을 시작하지 않는다.
 
+### 권장 실행 예시
+
+권장 CSI GStreamer 입력 파이프라인:
+
+```bash
+libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180
+```
+
+참고:
+
+- `--camera-pipeline` 문자열에는 입력 파이프라인만 넣는다.
+- 끝에 `appsink` 를 붙이지 않는다.
+- 현재 앱이 내부에서 `appsink` 를 자동으로 붙인다.
+- 아래 파이프라인 예시는 Raspberry Pi 로컬 `libcamera` 환경에서 검증했던 `NV12 + videoflip` 기준이다.
+- `--camera-pipeline` 은 입력 파이프라인 문자열만 주입하므로, 고급 옵션으로 취급하는 것을 권장한다.
+
+CSI 카메라 + `libcamera` 소스:
+
+```bash
+./bin/catcheye-guard --camera --camera-width 1280 --camera-height 720
+```
+
+CSI 카메라 + `gstreamer` 소스 + RTSP 송출:
+
+```bash
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip method=rotate-180" --rtsp 8554
+```
+
+CSI 카메라 + `gstreamer` 소스 + WebSocket 송출:
+
+```bash
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector ncnn
+```
+
+CSI 카메라 + `gstreamer` 소스 + WebSocket 송출 + Hailo 백엔드:
+
+```bash
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector hailo --hef ./models/model.hef
+```
+
+USB 카메라 + `gstreamer` 소스:
+
+```bash
+./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540
+```
+
+USB 카메라 + `gstreamer` 소스 + RTSP 송출:
+
+```bash
+./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --rtsp 8554
+```
+
+USB 카메라 + `gstreamer` 소스 + WebSocket 송출:
+
+```bash
+./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --ws 8080
+```
+
+위험 ROI 진입 시 GPIO18로 100ms pulse 출력:
+
+```bash
+./bin/catcheye-guard --camera --roi-alert-gpio 18 --roi-alert-pulse-ms 100
+```
+
+이미지 파일 입력:
+
+```bash
+./bin/catcheye-guard --image ./frame.jpg
+```
+
+이미지 파일 입력 + RTSP 송출:
+
+```bash
+./bin/catcheye-guard --image ./frame.jpg --rtsp 8554
+```
+
+이미지 파일 입력 + WebSocket 송출:
+
+```bash
+./bin/catcheye-guard --image ./frame.jpg --ws 8080
+```
+
+동영상 파일 입력:
+
+```bash
+./bin/catcheye-guard --video ./sample.mp4
+```
+
+동영상 파일 입력 + RTSP 송출:
+
+```bash
+./bin/catcheye-guard --video ./sample.mp4 --rtsp 8554
+```
+
+동영상 파일 입력 + WebSocket 송출:
+
+```bash
+./bin/catcheye-guard --video ./sample.mp4 --ws 8080
+```
+
+모델/메타데이터/ROI 경로를 함께 넘기는 예시:
+
+```bash
+./bin/catcheye-guard --image ./frame.jpg ./models/model.ncnn.param ./models/model.ncnn.bin ./models/metadata.yaml ./config/roi_cam_default.json
+```
+
+Hailo HEF 모델을 쓰는 예시:
+
+```bash
+./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector hailo --hef ./models/model.hef
+```
+
 WebSocket 송출 형식:
 
 - 클라이언트는 `ws://<host>:<port>/` 로 접속한다.
@@ -562,118 +674,6 @@ curl -X PUT http://<host>:8090/api/pallet-roi \
 - WebSocket이 기본 송출 방식이다. `--ws [port]` 로 켜고 `ws://<host>:<port>/` 로 받는다. 기본 포트는 `8080` 이다.
 - WebSocket은 프레임마다 JSON 텍스트 프레임 다음에 JPEG 바이너리 프레임을 보낸다.
 - RTSP는 선택사항이다. `--rtsp [port]` 로 켜고 `rtsp://<host>:<port>/stream` 으로 본다. 기본 포트는 `8554` 다.
-
-## 권장 실행 예시
-
-권장 CSI GStreamer 입력 파이프라인:
-
-```bash
-libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180
-```
-
-참고:
-
-- `--camera-pipeline` 문자열에는 입력 파이프라인만 넣는다.
-- 끝에 `appsink` 를 붙이지 않는다.
-- 현재 앱이 내부에서 `appsink` 를 자동으로 붙인다.
-- 아래 파이프라인 예시는 Raspberry Pi 로컬 `libcamera` 환경에서 검증했던 `NV12 + videoflip` 기준이다.
-- `--camera-pipeline` 은 입력 파이프라인 문자열만 주입하므로, 고급 옵션으로 취급하는 것을 권장한다.
-
-CSI 카메라 + `libcamera` 소스:
-
-```bash
-./bin/catcheye-guard --camera --camera-width 1280 --camera-height 720
-```
-
-CSI 카메라 + `gstreamer` 소스 + RTSP 송출:
-
-```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=640,height=480,framerate=15/1,format=NV12 ! videoflip method=rotate-180" --rtsp 8554
-```
-
-CSI 카메라 + `gstreamer` 소스 + WebSocket 송출:
-
-```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector ncnn
-```
-
-CSI 카메라 + `gstreamer` 소스 + WebSocket 송출 + Hailo 백엔드:
-
-```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector hailo --hef ./models/model.hef
-```
-
-USB 카메라 + `gstreamer` 소스:
-
-```bash
-./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540
-```
-
-USB 카메라 + `gstreamer` 소스 + RTSP 송출:
-
-```bash
-./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --rtsp 8554
-```
-
-USB 카메라 + `gstreamer` 소스 + WebSocket 송출:
-
-```bash
-./bin/catcheye-guard --camera --camera-device /dev/video0 --camera-width 960 --camera-height 540 --ws 8080
-```
-
-위험 ROI 진입 시 GPIO18로 100ms pulse 출력:
-
-```bash
-./bin/catcheye-guard --camera --roi-alert-gpio 18 --roi-alert-pulse-ms 100
-```
-
-이미지 파일 입력:
-
-```bash
-./bin/catcheye-guard --image ./frame.jpg
-```
-
-이미지 파일 입력 + RTSP 송출:
-
-```bash
-./bin/catcheye-guard --image ./frame.jpg --rtsp 8554
-```
-
-이미지 파일 입력 + WebSocket 송출:
-
-```bash
-./bin/catcheye-guard --image ./frame.jpg --ws 8080
-```
-
-동영상 파일 입력:
-
-```bash
-./bin/catcheye-guard --video ./sample.mp4
-```
-
-동영상 파일 입력 + RTSP 송출:
-
-```bash
-./bin/catcheye-guard --video ./sample.mp4 --rtsp 8554
-```
-
-동영상 파일 입력 + WebSocket 송출:
-
-```bash
-./bin/catcheye-guard --video ./sample.mp4 --ws 8080
-```
-
-모델/메타데이터/ROI 경로를 함께 넘기는 예시:
-
-```bash
-./bin/catcheye-guard --image ./frame.jpg ./models/model.ncnn.param ./models/model.ncnn.bin ./models/metadata.yaml ./config/roi_cam_default.json
-```
-
-Hailo HEF 모델을 쓰는 예시:
-
-```bash
-./bin/catcheye-guard --camera --camera-pipeline "libcamerasrc ! video/x-raw,width=1920,height=1080,framerate=10/1,format=NV12 ! videoflip method=rotate-180" --ws --detector hailo --hef ./models/model.hef
-```
 
 ## 문제 생기면 확인
 
