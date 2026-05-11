@@ -2,8 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-CATHEYE_GUARD_PATH="$REPO_ROOT/install/release-hailo"
+CATHEYE_GUARD_PATH="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
 exec "$CATHEYE_GUARD_PATH/bin/catcheye-guard" \
   --camera \
