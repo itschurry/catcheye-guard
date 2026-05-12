@@ -114,6 +114,8 @@ target_link_libraries(catcheye_guard
         catcheye::vision_protocol
         catcheye::vision_runtime
         catcheye::vision_transport
+        catcheye::vision_visualization
+        catcheye::vision_http
         ${OpenCV_LIBS}
         lapack
         blas
@@ -238,6 +240,20 @@ install(TARGETS catcheye_vision_runtime
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+install(TARGETS catcheye_vision_visualization
+    EXPORT catcheye_guard_targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(TARGETS catcheye_vision_http
+    EXPORT catcheye_guard_targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
 install(TARGETS catcheye_guard
     EXPORT catcheye_guard_targets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -280,6 +296,14 @@ install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-transport/includ
 )
 
 install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-runtime/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-visualization/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-http/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 

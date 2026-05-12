@@ -5,6 +5,7 @@
 #include "catcheye/roi/camera_roi_config.hpp"
 #include "guard/detection_postprocess.hpp"
 #include "catcheye/detection/detector.hpp"
+#include "catcheye/visualization/annotation_renderer.hpp"
 
 namespace catcheye {
 

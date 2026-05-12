@@ -17,14 +17,6 @@ const cv::Scalar kPalletRoiColor(255, 255, 255);
 const cv::Scalar kPalletPresentColor(128, 128, 128);
 const cv::Scalar kPalletOutsideColor(255, 0, 255);
 
-cv::Rect to_rect(const BoundingBox& box) {
-    return cv::Rect(
-        static_cast<int>(box.x),
-        static_cast<int>(box.y),
-        static_cast<int>(box.width),
-        static_cast<int>(box.height));
-}
-
 cv::Point to_cv_point(const catcheye::roi::Point& point) {
     return cv::Point(
         static_cast<int>(std::lround(point.x)),
@@ -46,6 +38,13 @@ cv::Scalar detection_color(const EvaluatedDetection& detection, bool roi_enabled
     }
 
     return cv::Scalar(255, 255, 255);
+}
+
+catcheye::visualization::DetectionAnnotationStyle annotation_style(cv::Scalar color) {
+    return catcheye::visualization::DetectionAnnotationStyle{
+        .box_color = color,
+        .line_thickness = 2,
+    };
 }
 
 } // namespace
@@ -96,17 +95,17 @@ void draw_detections(
     (void)detector;
 
     for (const EvaluatedDetection& evaluated_detection : detections) {
-        const cv::Rect box = to_rect(evaluated_detection.detection.box);
         const cv::Scalar color = detection_color(evaluated_detection, roi_enabled);
-        cv::rectangle(image, box, color, 2);
+        const std::vector<Detection> detection{evaluated_detection.detection};
+        catcheye::visualization::draw_detection_boxes(image, detection, annotation_style(color));
     }
 }
 
 void draw_pallet_detections(cv::Mat& image, const std::vector<PalletEvaluation>& detections) {
     for (const PalletEvaluation& detection : detections) {
-        const cv::Rect box = to_rect(detection.detection.box);
         const cv::Scalar color = detection.present ? kPalletPresentColor : kPalletOutsideColor;
-        cv::rectangle(image, box, color, 2);
+        const std::vector<Detection> single_detection{detection.detection};
+        catcheye::visualization::draw_detection_boxes(image, single_detection, annotation_style(color));
     }
 }
 
