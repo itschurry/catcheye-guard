@@ -16,7 +16,7 @@
 #include "catcheye/runtime/frame_processing_runner.hpp"
 #include "catcheye/transport/rtsp_publisher.hpp"
 #include "catcheye/utils/logger.hpp"
-#include "guard/http_roi_server.hpp"
+#include "guard/http_api_server.hpp"
 #include "guard/processor.hpp"
 
 namespace catcheye::guard {
@@ -386,7 +386,7 @@ AppBootstrap build_app_bootstrap(
     bootstrap.rtsp_publisher_config.width = options.input.camera_width;
     bootstrap.rtsp_publisher_config.height = options.input.camera_height;
     bootstrap.websocket_publisher_config.port = options.websocket_port;
-    bootstrap.http_roi_server_config.port = options.http_port;
+    bootstrap.http_api_server_config.port = options.http_port;
 
     if (!options.viewer_only && options.detector_backend == catcheye::DetectorBackend::Ncnn && (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty())) {
         throw std::runtime_error("NCNN model paths are required");
@@ -421,7 +421,7 @@ int run_app(int argc, char** argv) {
                       bootstrap.processor_config.roi_config_path,
                       bootstrap.processor_config.pallet_roi_config_path,
                       publisher_name(bootstrap.publisher_type),
-                      bootstrap.http_roi_server_config.port);
+                      bootstrap.http_api_server_config.port);
         }
         if (bootstrap.processor_config.detection_enabled) {
             log->info("detector backend: {}", detector_backend_name(bootstrap.processor_config.detector.backend));
@@ -449,21 +449,21 @@ int run_app(int argc, char** argv) {
     auto processor = std::make_unique<catcheye::GuardProcessor>(std::move(bootstrap.processor_config));
     auto* processor_ptr = processor.get();
     auto* camera_source_ptr = bootstrap.source.get();
-    auto roi_server = std::make_unique<HttpRoiServer>(
-        bootstrap.http_roi_server_config,
+    auto http_api_server = std::make_unique<HttpApiServer>(
+        bootstrap.http_api_server_config,
         http_roi_config_path,
         http_pallet_roi_config_path,
         processor_ptr,
         camera_source_ptr);
-    if (!roi_server->start()) {
+    if (!http_api_server->start()) {
         throw std::runtime_error("failed to start HTTP API server");
     }
 
     catcheye::runtime::FrameProcessingRunner runner(std::move(bootstrap.runtime_config), std::move(bootstrap.source), std::move(processor),
                                                     std::move(publisher));
     const int exit_code = runner.run();
-    if (roi_server) {
-        roi_server->stop();
+    if (http_api_server) {
+        http_api_server->stop();
     }
     return exit_code;
 }

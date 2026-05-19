@@ -1,4 +1,4 @@
-#include "guard/http_roi_server.hpp"
+#include "guard/http_api_server.hpp"
 
 #include <cctype>
 #include <cmath>
@@ -214,8 +214,8 @@ catcheye::http::HttpResponse put_rgb_camera_property(
 
 } // namespace
 
-HttpRoiServer::HttpRoiServer(
-    HttpRoiServerConfig config,
+HttpApiServer::HttpApiServer(
+    HttpApiServerConfig config,
     std::string roi_config_path,
     std::string pallet_roi_config_path,
     GuardProcessor* processor,
@@ -226,12 +226,12 @@ HttpRoiServer::HttpRoiServer(
       processor_(processor),
       camera_source_(camera_source) {}
 
-HttpRoiServer::~HttpRoiServer()
+HttpApiServer::~HttpApiServer()
 {
     stop();
 }
 
-bool HttpRoiServer::start()
+bool HttpApiServer::start()
 {
     if (server_ != nullptr) {
         return true;
@@ -244,6 +244,14 @@ bool HttpRoiServer::start()
         .bind_address = config_.bind_address,
         .port = config_.port,
     });
+
+    server_->add_route("/api/device-info", [](const catcheye::http::HttpRequest& request) {
+        if (request.method == "GET") {
+            return catcheye::http::HttpResponse{200, "OK", R"({"app":"catcheye-guard","kind":"guard"})"};
+        }
+        return catcheye::http::HttpResponse{405, "Method Not Allowed", catcheye::http::json_error_body("method not allowed")};
+    });
+
     if (!roi_config_path_.empty() && !pallet_roi_config_path_.empty()) {
         catcheye::http::register_roi_routes(
             *server_,
@@ -286,7 +294,7 @@ bool HttpRoiServer::start()
     return true;
 }
 
-void HttpRoiServer::stop()
+void HttpApiServer::stop()
 {
     if (server_ != nullptr) {
         server_->stop();

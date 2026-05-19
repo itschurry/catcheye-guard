@@ -7,7 +7,7 @@
 #include "catcheye/input/frame_source.hpp"
 #include "catcheye/roi/camera_roi_config.hpp"
 #include "catcheye/runtime/frame_processing_runner.hpp"
-#include "guard/http_roi_server.hpp"
+#include "guard/http_api_server.hpp"
 #include "catcheye/transport/rtsp_publisher.hpp"
 #include "catcheye/transport/websocket_publisher.hpp"
 #include "guard/processor_config.hpp"
@@ -61,7 +61,7 @@ struct AppBootstrap {
     PublisherType publisher_type = PublisherType::None;
     catcheye::transport::RtspPublisherConfig rtsp_publisher_config;
     catcheye::transport::WebSocketPublisherConfig websocket_publisher_config;
-    HttpRoiServerConfig http_roi_server_config;
+    HttpApiServerConfig http_api_server_config;
     std::unique_ptr<catcheye::input::FrameSource> source;
 };
 

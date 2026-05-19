@@ -10,26 +10,26 @@ namespace catcheye {
 
 class GuardProcessor;
 
-struct HttpRoiServerConfig {
+struct HttpApiServerConfig {
     std::string bind_address = "0.0.0.0";
     int port = 8090;
 };
 
-class HttpRoiServer {
+class HttpApiServer {
   public:
-    HttpRoiServer(
-        HttpRoiServerConfig config,
+    HttpApiServer(
+        HttpApiServerConfig config,
         std::string roi_config_path,
         std::string pallet_roi_config_path,
         GuardProcessor* processor,
         catcheye::input::FrameSource* camera_source);
-    ~HttpRoiServer();
+    ~HttpApiServer();
 
     bool start();
     void stop();
 
   private:
-    HttpRoiServerConfig config_;
+    HttpApiServerConfig config_;
     std::string roi_config_path_;
     std::string pallet_roi_config_path_;
     GuardProcessor* processor_ = nullptr;
