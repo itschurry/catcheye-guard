@@ -1,0 +1,13 @@
+[Unit]
+Description=CatchEye Guard Hailo runtime
+After=multi-user.target
+
+[Service]
+Type=simple
+User=user
+Group=user
+WorkingDirectory=/home/user/catcheye-guard/install/release-hailo
+ExecStart=/home/user/catcheye-guard/install/release-hailo/scripts/run-hailo.sh
+
+[Install]
+WantedBy=multi-user.target

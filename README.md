@@ -322,6 +322,28 @@ cd /opt/catcheye-guard
 ./bin/catcheye-guard --camera --ws
 ```
 
+Hailo 설치 결과물을 홈 디렉터리 기준으로 바로 실행할 때:
+
+```bash
+~/catcheye-guard/install/release-hailo/scripts/run-hailo.sh
+```
+
+부팅 시 Hailo 실행 스크립트를 자동 시작하려면 systemd 서비스로 등록한다.
+서비스는 `/home/user/catcheye-guard/install/release-hailo/scripts/run-hailo.sh` 를 그대로 실행한다.
+
+```bash
+sudo install -m 0644 \
+  ~/catcheye-guard/install/release-hailo/scripts/catcheye-guard-hailo.service \
+  /etc/systemd/system/catcheye-guard-hailo.service
+
+sudo systemctl daemon-reload
+sudo systemctl enable catcheye-guard-hailo.service
+sudo systemctl start catcheye-guard-hailo.service
+
+systemctl status catcheye-guard-hailo.service --no-pager
+journalctl -u catcheye-guard-hailo.service -n 100 --no-pager
+```
+
 실행 파일 구조:
 
 - 사용자는 `bin/catcheye-guard` 를 실행하면 된다.

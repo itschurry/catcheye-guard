@@ -325,6 +325,10 @@ install(PROGRAMS scripts/run-hailo.sh
     DESTINATION scripts
 )
 
+install(FILES scripts/catcheye-guard-hailo.service
+    DESTINATION scripts
+)
+
 if(CATCHEYE_GUARD_BUNDLE_NCNN)
     set(CATCHEYE_NCNN_LIBRARIES)
     set(CATCHEYE_NCNN_LIBRARY_DIRS)
