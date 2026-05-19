@@ -7,6 +7,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -20,6 +21,11 @@
 
 namespace catcheye::guard {
 namespace {
+
+constexpr std::string_view DEFAULT_CAMERA_PIPELINE =
+    "libcamerasrc ! video/x-raw,width=2304,height=1296,framerate=15/1,format=NV12 ! queue leaky=downstream max-size-buffers=1 ! videoflip method=rotate-180";
+constexpr int DEFAULT_CAMERA_WIDTH = 2304;
+constexpr int DEFAULT_CAMERA_HEIGHT = 1296;
 
 const char* publisher_name(PublisherType type) {
     switch (type) {
@@ -270,6 +276,14 @@ AppOptions parse_app_options(int argc, char** argv) {
         throw std::runtime_error("camera dimensions must be even for NV12/RTSP output");
     }
 
+    if (options.input.type == catcheye::input::InputSourceType::Camera &&
+        options.input.camera_pipeline.empty() &&
+        options.input.camera_device.empty()) {
+        options.input.camera_pipeline = std::string(DEFAULT_CAMERA_PIPELINE);
+        options.input.camera_width = DEFAULT_CAMERA_WIDTH;
+        options.input.camera_height = DEFAULT_CAMERA_HEIGHT;
+    }
+
     if (options.viewer_only) {
         if (options.input.type != catcheye::input::InputSourceType::Camera) {
             throw std::runtime_error("--viewer-only is only valid with --camera");
@@ -434,16 +448,15 @@ int run_app(int argc, char** argv) {
     const std::string http_pallet_roi_config_path = bootstrap.processor_config.pallet_roi_config_path;
     auto processor = std::make_unique<catcheye::GuardProcessor>(std::move(bootstrap.processor_config));
     auto* processor_ptr = processor.get();
-    std::unique_ptr<HttpRoiServer> roi_server;
-    if (!options.viewer_only) {
-        roi_server = std::make_unique<HttpRoiServer>(
-            bootstrap.http_roi_server_config,
-            http_roi_config_path,
-            http_pallet_roi_config_path,
-            processor_ptr);
-        if (!roi_server->start()) {
-            throw std::runtime_error("failed to start ROI HTTP API server");
-        }
+    auto* camera_source_ptr = bootstrap.source.get();
+    auto roi_server = std::make_unique<HttpRoiServer>(
+        bootstrap.http_roi_server_config,
+        http_roi_config_path,
+        http_pallet_roi_config_path,
+        processor_ptr,
+        camera_source_ptr);
+    if (!roi_server->start()) {
+        throw std::runtime_error("failed to start HTTP API server");
     }
 
     catcheye::runtime::FrameProcessingRunner runner(std::move(bootstrap.runtime_config), std::move(bootstrap.source), std::move(processor),

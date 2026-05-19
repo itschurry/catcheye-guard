@@ -4,6 +4,7 @@
 #include <string>
 
 #include "catcheye/http/http_server.hpp"
+#include "catcheye/input/frame_source.hpp"
 
 namespace catcheye {
 
@@ -16,7 +17,12 @@ struct HttpRoiServerConfig {
 
 class HttpRoiServer {
   public:
-    HttpRoiServer(HttpRoiServerConfig config, std::string roi_config_path, std::string pallet_roi_config_path, GuardProcessor* processor);
+    HttpRoiServer(
+        HttpRoiServerConfig config,
+        std::string roi_config_path,
+        std::string pallet_roi_config_path,
+        GuardProcessor* processor,
+        catcheye::input::FrameSource* camera_source);
     ~HttpRoiServer();
 
     bool start();
@@ -27,6 +33,7 @@ class HttpRoiServer {
     std::string roi_config_path_;
     std::string pallet_roi_config_path_;
     GuardProcessor* processor_ = nullptr;
+    catcheye::input::FrameSource* camera_source_ = nullptr;
     std::unique_ptr<catcheye::http::HttpServer> server_;
 };
 
