@@ -37,6 +37,7 @@ struct AppOptions {
     std::string hef_path;
     std::string metadata_path;
     std::string pallet_roi_config_path;
+    std::string recording_dir = "recordings";
     std::vector<std::string> positional_args;
 };
 

@@ -63,7 +63,7 @@ add_subdirectory(
     "${CMAKE_CURRENT_BINARY_DIR}/catcheye-vision-sdk"
 )
 
-find_package(OpenCV REQUIRED COMPONENTS core imgproc dnn imgcodecs)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc dnn imgcodecs videoio)
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
 
 find_package(spdlog REQUIRED)
@@ -321,7 +321,9 @@ install(
     PATTERN "*.pyc" EXCLUDE
 )
 
-install(PROGRAMS scripts/run-hailo.sh
+install(PROGRAMS 
+    scripts/run.sh
+    scripts/run-hailo.sh
     DESTINATION scripts
 )
 

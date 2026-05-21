@@ -6,7 +6,7 @@ After=multi-user.target
 Type=simple
 User=user
 Group=user
-WorkingDirectory=/home/user/catcheye-guard/install/release-hailo
+WorkingDirectory=/home/user/catcheye-guard
 ExecStart=/home/user/catcheye-guard/install/release-hailo/scripts/run-hailo.sh
 
 [Install]

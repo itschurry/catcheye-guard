@@ -18,6 +18,7 @@
 #include "catcheye/utils/logger.hpp"
 #include "guard/http_api_server.hpp"
 #include "guard/processor.hpp"
+#include "guard/recording_controller.hpp"
 
 namespace catcheye::guard {
 namespace {
@@ -219,6 +220,8 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.metadata_path = args[++i];
         } else if (arg == "--pallet-roi" && i + 1 < args.size()) {
             options.pallet_roi_config_path = args[++i];
+        } else if (arg == "--recording-dir" && i + 1 < args.size()) {
+            options.recording_dir = args[++i];
         } else if (arg == "--pallet-class-id" && i + 1 < args.size()) {
             options.pallet_class_id = std::stoi(args[++i]);
         } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" ||
@@ -226,7 +229,7 @@ AppOptions parse_app_options(int argc, char** argv) {
                    arg == "--camera-width" || arg == "--camera-height" || arg == "--num-threads" ||
                    arg == "--http-port" || arg == "--roi-alert-gpio" || arg == "--roi-alert-pulse-ms" ||
                    arg == "--gpio-chip" || arg == "--detector" || arg == "--hef" || arg == "--metadata" ||
-                   arg == "--pallet-roi" || arg == "--pallet-class-id") {
+                   arg == "--pallet-roi" || arg == "--recording-dir" || arg == "--pallet-class-id") {
             throw std::runtime_error("missing value for flag: " + arg);
         } else if (is_input_mode(arg)) {
             throw std::runtime_error("input mode flags are mutually exclusive");
@@ -270,6 +273,9 @@ AppOptions parse_app_options(int argc, char** argv) {
     }
     if (options.pallet_class_id < 0) {
         throw std::runtime_error("pallet class id must be a non-negative integer");
+    }
+    if (options.recording_dir.empty()) {
+        throw std::runtime_error("recording directory must not be empty");
     }
 
     if ((options.input.camera_width % 2) != 0 || (options.input.camera_height % 2) != 0) {
@@ -443,6 +449,8 @@ int run_app(int argc, char** argv) {
     } else if (bootstrap.publisher_type == PublisherType::WebSocket) {
         publisher = std::make_unique<catcheye::transport::WebSocketPublisher>(bootstrap.websocket_publisher_config);
     }
+    auto recording_controller = std::make_unique<catcheye::RecordingController>(options.recording_dir);
+    publisher = std::make_unique<catcheye::RecordingPublisher>(std::move(publisher), *recording_controller);
 
     const std::string http_roi_config_path = bootstrap.processor_config.roi_config_path;
     const std::string http_pallet_roi_config_path = bootstrap.processor_config.pallet_roi_config_path;
@@ -454,7 +462,8 @@ int run_app(int argc, char** argv) {
         http_roi_config_path,
         http_pallet_roi_config_path,
         processor_ptr,
-        camera_source_ptr);
+        camera_source_ptr,
+        recording_controller.get());
     if (!http_api_server->start()) {
         throw std::runtime_error("failed to start HTTP API server");
     }

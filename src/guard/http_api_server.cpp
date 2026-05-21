@@ -10,6 +10,7 @@
 #include "catcheye/http/roi_api.hpp"
 #include "catcheye/utils/logger.hpp"
 #include "guard/processor.hpp"
+#include "guard/recording_controller.hpp"
 
 namespace catcheye {
 namespace {
@@ -212,6 +213,11 @@ catcheye::http::HttpResponse put_rgb_camera_property(
     return get_rgb_camera_properties(camera_source);
 }
 
+catcheye::http::HttpResponse recording_response(const RecordingStatus& status)
+{
+    return {200, "OK", recording_status_json(status)};
+}
+
 } // namespace
 
 HttpApiServer::HttpApiServer(
@@ -219,12 +225,14 @@ HttpApiServer::HttpApiServer(
     std::string roi_config_path,
     std::string pallet_roi_config_path,
     GuardProcessor* processor,
-    catcheye::input::FrameSource* camera_source)
+    catcheye::input::FrameSource* camera_source,
+    RecordingController* recording_controller)
     : config_(std::move(config)),
       roi_config_path_(std::move(roi_config_path)),
       pallet_roi_config_path_(std::move(pallet_roi_config_path)),
       processor_(processor),
-      camera_source_(camera_source) {}
+      camera_source_(camera_source),
+      recording_controller_(recording_controller) {}
 
 HttpApiServer::~HttpApiServer()
 {
@@ -279,6 +287,66 @@ bool HttpApiServer::start()
         const std::string key = request.path.substr(rgb_camera_property_prefix_size);
         if (request.method == "PUT") {
             return put_rgb_camera_property(camera_source_, key, request.body);
+        }
+        return catcheye::http::HttpResponse{405, "Method Not Allowed", catcheye::http::json_error_body("method not allowed")};
+    });
+
+    server_->add_route("/api/recording", [this](const catcheye::http::HttpRequest& request) {
+        if (recording_controller_ == nullptr) {
+            return catcheye::http::HttpResponse{409, "Conflict", catcheye::http::json_error_body("recording is not enabled")};
+        }
+        if (request.method == "GET") {
+            return recording_response(recording_controller_->status());
+        }
+        return catcheye::http::HttpResponse{405, "Method Not Allowed", catcheye::http::json_error_body("method not allowed")};
+    });
+
+    server_->add_route("/api/recording/start", [this](const catcheye::http::HttpRequest& request) {
+        if (recording_controller_ == nullptr) {
+            return catcheye::http::HttpResponse{409, "Conflict", catcheye::http::json_error_body("recording is not enabled")};
+        }
+        if (request.method == "POST") {
+            return recording_response(recording_controller_->start());
+        }
+        return catcheye::http::HttpResponse{405, "Method Not Allowed", catcheye::http::json_error_body("method not allowed")};
+    });
+
+    server_->add_route("/api/recording/pause", [this](const catcheye::http::HttpRequest& request) {
+        if (recording_controller_ == nullptr) {
+            return catcheye::http::HttpResponse{409, "Conflict", catcheye::http::json_error_body("recording is not enabled")};
+        }
+        if (request.method == "POST") {
+            return recording_response(recording_controller_->pause());
+        }
+        return catcheye::http::HttpResponse{405, "Method Not Allowed", catcheye::http::json_error_body("method not allowed")};
+    });
+
+    server_->add_route("/api/recording/resume", [this](const catcheye::http::HttpRequest& request) {
+        if (recording_controller_ == nullptr) {
+            return catcheye::http::HttpResponse{409, "Conflict", catcheye::http::json_error_body("recording is not enabled")};
+        }
+        if (request.method == "POST") {
+            return recording_response(recording_controller_->resume());
+        }
+        return catcheye::http::HttpResponse{405, "Method Not Allowed", catcheye::http::json_error_body("method not allowed")};
+    });
+
+    server_->add_route("/api/recording/save", [this](const catcheye::http::HttpRequest& request) {
+        if (recording_controller_ == nullptr) {
+            return catcheye::http::HttpResponse{409, "Conflict", catcheye::http::json_error_body("recording is not enabled")};
+        }
+        if (request.method == "POST") {
+            return recording_response(recording_controller_->save());
+        }
+        return catcheye::http::HttpResponse{405, "Method Not Allowed", catcheye::http::json_error_body("method not allowed")};
+    });
+
+    server_->add_route("/api/recording/cancel", [this](const catcheye::http::HttpRequest& request) {
+        if (recording_controller_ == nullptr) {
+            return catcheye::http::HttpResponse{409, "Conflict", catcheye::http::json_error_body("recording is not enabled")};
+        }
+        if (request.method == "POST") {
+            return recording_response(recording_controller_->cancel());
         }
         return catcheye::http::HttpResponse{405, "Method Not Allowed", catcheye::http::json_error_body("method not allowed")};
     });
