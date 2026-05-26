@@ -42,5 +42,11 @@ for item in data:
 target.write_text(json.dumps(data, indent=2) + "\n")
 PY
 
-ln -sfn build/compile_commands.json compile_commands.json
-echo "synced compile_commands.json for host: $HOST_WORKDIR"
+if [[ -L compile_commands.json ]]; then
+  rm -f compile_commands.json
+elif [[ -e compile_commands.json ]]; then
+  echo "unexpected root compile_commands.json: remove it before syncing" >&2
+  exit 1
+fi
+
+echo "synced build/compile_commands.json for host: $HOST_WORKDIR"

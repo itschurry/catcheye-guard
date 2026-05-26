@@ -224,7 +224,8 @@ scripts/cmake.sh install release
 scripts/cmake.sh all release-hailo
 ```
 
-`scripts/cmake.sh build`는 컨테이너 경로가 들어간 `compile_commands.json`을 호스트 경로로 바꿔 `build/compile_commands.json`과 루트 `compile_commands.json`에 연결한다.
+`scripts/cmake.sh build`는 `build/release-hailo/compile_commands.json`의 컨테이너 경로를 호스트 경로로 바꿔 `build/compile_commands.json`에 쓴다.
+`clangd`는 `.clangd` 설정에 따라 `build/compile_commands.json`을 읽는다.
 
 이미지 빌드 과정에서 아래 항목이 자동으로 준비된다.
 
