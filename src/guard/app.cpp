@@ -58,9 +58,6 @@ void print_usage() {
               << "  --roi-alert-active-low      Drive ROI alert GPIO active-low\n"
               << "  --recording-dir <path>      Preview recording directory (default: recordings)\n"
               << "\n"
-              << "Removed options:\n"
-              << "  --rtsp-with-preview, --ws-with-preview, --headless\n"
-              << "\n"
               << "Examples:\n"
               << "  catcheye-guard --help\n"
               << "  catcheye-guard --camera --ws\n"
@@ -123,18 +120,25 @@ std::string resolve_default_config_path(const char* executable_path, const std::
     return (fs::current_path() / "config" / relative_path).lexically_normal().string();
 }
 
-bool is_input_mode(const std::string& arg) {
+bool is_input_mode(std::string_view arg) {
     return arg == "--image" || arg == "--video" || arg == "--camera";
 }
 
-catcheye::DetectorBackend parse_detector_backend(const std::string& value) {
+catcheye::DetectorBackend parse_detector_backend(std::string_view value) {
     if (value == "ncnn") {
         return catcheye::DetectorBackend::Ncnn;
     }
     if (value == "hailo") {
         return catcheye::DetectorBackend::Hailo;
     }
-    throw std::runtime_error("unsupported detector backend: " + value);
+    throw std::invalid_argument("unknown detector backend: " + std::string(value));
+}
+
+std::string_view read_required_value(std::span<char* const> args, std::size_t& index, std::string_view flag) {
+    if (index + 1 >= args.size()) {
+        throw std::invalid_argument(std::string(flag) + " requires a value");
+    }
+    return args[++index];
 }
 
 const char* detector_backend_name(catcheye::DetectorBackend backend) {
@@ -180,45 +184,44 @@ AppOptions parse_app_options(int argc, char** argv) {
     bool input_mode_selected = false;
 
     for (std::size_t i = 1; i < args.size(); ++i) {
-        std::string arg(args[i]);
+        const std::string_view arg(args[i]);
         if (arg == "--help" || arg == "-h") {
             options.show_help = true;
-        } else if (arg == "--image" && i + 1 < args.size()) {
+        } else if (arg == "--image") {
             if (input_mode_selected) {
                 throw std::runtime_error("input mode flags are mutually exclusive");
             }
             input_mode_selected = true;
             options.input.type = catcheye::input::InputSourceType::ImageFile;
-            options.input.uri = args[++i];
-        } else if (arg == "--video" && i + 1 < args.size()) {
+            options.input.uri = read_required_value(args, i, arg);
+        } else if (arg == "--video") {
             if (input_mode_selected) {
                 throw std::runtime_error("input mode flags are mutually exclusive");
             }
             input_mode_selected = true;
             options.input.type = catcheye::input::InputSourceType::VideoFile;
-            options.input.uri = args[++i];
+            options.input.uri = read_required_value(args, i, arg);
         } else if (arg == "--camera") {
             if (input_mode_selected) {
                 throw std::runtime_error("input mode flags are mutually exclusive");
             }
             input_mode_selected = true;
             options.input.type = catcheye::input::InputSourceType::Camera;
-        } else if (arg == "--camera-pipeline" && i + 1 < args.size()) {
-            options.input.camera_pipeline = args[++i];
-        } else if (arg == "--camera-device" && i + 1 < args.size()) {
-            options.input.camera_device = args[++i];
-        } else if (arg == "--camera-width" && i + 1 < args.size()) {
-            options.input.camera_width = std::stoi(args[++i]);
-        } else if (arg == "--camera-height" && i + 1 < args.size()) {
-            options.input.camera_height = std::stoi(args[++i]);
+        } else if (arg == "--camera-pipeline") {
+            options.input.camera_pipeline = read_required_value(args, i, arg);
+        } else if (arg == "--camera-device") {
+            options.input.camera_device = read_required_value(args, i, arg);
+        } else if (arg == "--camera-width") {
+            options.input.camera_width = std::stoi(std::string(read_required_value(args, i, arg)));
+        } else if (arg == "--camera-height") {
+            options.input.camera_height = std::stoi(std::string(read_required_value(args, i, arg)));
         } else if (arg == "--rtsp") {
             if (options.publisher_type != PublisherType::None) {
                 throw std::runtime_error("only one publisher can be selected at a time");
             }
             options.publisher_type = PublisherType::Rtsp;
             if (i + 1 < args.size() && args[i + 1][0] != '-') {
-                ++i;
-                options.rtsp_port = std::stoi(args[i]);
+                options.rtsp_port = std::stoi(std::string(read_required_value(args, i, arg)));
             }
         } else if (arg == "--ws") {
             if (options.publisher_type != PublisherType::None) {
@@ -226,57 +229,46 @@ AppOptions parse_app_options(int argc, char** argv) {
             }
             options.publisher_type = PublisherType::WebSocket;
             if (i + 1 < args.size() && args[i + 1][0] != '-') {
-                ++i;
-                options.websocket_port = std::stoi(args[i]);
+                options.websocket_port = std::stoi(std::string(read_required_value(args, i, arg)));
             }
         } else if (arg == "--rtsp-with-preview") {
-            throw std::runtime_error("--rtsp-with-preview is no longer supported; use --rtsp");
+            throw std::invalid_argument("--rtsp-with-preview is no longer supported; use --rtsp");
         } else if (arg == "--ws-with-preview") {
-            throw std::runtime_error("--ws-with-preview is no longer supported; use --ws");
+            throw std::invalid_argument("--ws-with-preview is no longer supported; use --ws");
         } else if (arg == "--headless") {
-            throw std::runtime_error("--headless is no longer needed; preview output is not supported");
-        } else if (arg == "--num-threads" && i + 1 < args.size()) {
-            ++i;
-            options.num_threads = std::stoi(args[i]);
-        } else if (arg == "--http-port" && i + 1 < args.size()) {
-            ++i;
-            options.http_port = std::stoi(args[i]);
-        } else if (arg == "--roi-alert-gpio" && i + 1 < args.size()) {
-            ++i;
-            options.roi_alert_gpio = std::stoi(args[i]);
-        } else if (arg == "--roi-alert-pulse-ms" && i + 1 < args.size()) {
-            ++i;
-            options.roi_alert_pulse_ms = std::stoi(args[i]);
-        } else if (arg == "--gpio-chip" && i + 1 < args.size()) {
-            ++i;
-            options.gpio_chip_path = args[i];
+            throw std::invalid_argument("--headless is no longer needed; preview output is not supported");
+        } else if (arg == "--num-threads") {
+            options.num_threads = std::stoi(std::string(read_required_value(args, i, arg)));
+        } else if (arg == "--http-port") {
+            options.http_port = std::stoi(std::string(read_required_value(args, i, arg)));
+        } else if (arg == "--roi-alert-gpio") {
+            options.roi_alert_gpio = std::stoi(std::string(read_required_value(args, i, arg)));
+        } else if (arg == "--roi-alert-pulse-ms") {
+            options.roi_alert_pulse_ms = std::stoi(std::string(read_required_value(args, i, arg)));
+        } else if (arg == "--gpio-chip") {
+            options.gpio_chip_path = read_required_value(args, i, arg);
         } else if (arg == "--roi-alert-active-low") {
             options.roi_alert_active_low = true;
         } else if (arg == "--viewer-only") {
             options.viewer_only = true;
-        } else if (arg == "--detector" && i + 1 < args.size()) {
-            options.detector_backend = parse_detector_backend(args[++i]);
-        } else if (arg == "--hef" && i + 1 < args.size()) {
-            options.hef_path = args[++i];
-        } else if (arg == "--metadata" && i + 1 < args.size()) {
-            options.metadata_path = args[++i];
-        } else if (arg == "--pallet-roi" && i + 1 < args.size()) {
-            options.pallet_roi_config_path = args[++i];
-        } else if (arg == "--recording-dir" && i + 1 < args.size()) {
-            options.recording_dir = args[++i];
-        } else if (arg == "--pallet-class-id" && i + 1 < args.size()) {
-            options.pallet_class_id = std::stoi(args[++i]);
-        } else if (arg == "--image" || arg == "--video" || arg == "--camera-pipeline" ||
-                   arg == "--camera-device" || arg == "--ws" ||
-                   arg == "--camera-width" || arg == "--camera-height" || arg == "--num-threads" ||
-                   arg == "--http-port" || arg == "--roi-alert-gpio" || arg == "--roi-alert-pulse-ms" ||
-                   arg == "--gpio-chip" || arg == "--detector" || arg == "--hef" || arg == "--metadata" ||
-                   arg == "--pallet-roi" || arg == "--recording-dir" || arg == "--pallet-class-id") {
-            throw std::runtime_error("missing value for flag: " + arg);
+        } else if (arg == "--detector") {
+            options.detector_backend = parse_detector_backend(read_required_value(args, i, arg));
+        } else if (arg == "--hef") {
+            options.hef_path = read_required_value(args, i, arg);
+        } else if (arg == "--metadata") {
+            options.metadata_path = read_required_value(args, i, arg);
+        } else if (arg == "--pallet-roi") {
+            options.pallet_roi_config_path = read_required_value(args, i, arg);
+        } else if (arg == "--recording-dir") {
+            options.recording_dir = read_required_value(args, i, arg);
+        } else if (arg == "--pallet-class-id") {
+            options.pallet_class_id = std::stoi(std::string(read_required_value(args, i, arg)));
         } else if (is_input_mode(arg)) {
             throw std::runtime_error("input mode flags are mutually exclusive");
+        } else if (!arg.empty() && arg.front() == '-') {
+            throw std::invalid_argument("unknown option: " + std::string(arg));
         } else {
-            options.positional_args.push_back(arg);
+            options.positional_args.emplace_back(arg);
         }
     }
 

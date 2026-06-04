@@ -437,9 +437,6 @@ Preview 표시 색상:
 - `--viewer-only` 에서는 모델, 메타데이터, ROI 경로 인자를 쓰지 않는다.
 - Hailo 백엔드는 빌드 시 `-DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON` 이 필요하다.
 - Hailo 백엔드를 실행하려면 Raspberry Pi에 HailoRT와 PCIe 드라이버가 설치되어 있어야 한다.
-- `--headless` 는 더 이상 지원하지 않는다.
-- `--rtsp-with-preview` 는 더 이상 지원하지 않는다.
-- `--ws-with-preview` 는 더 이상 지원하지 않는다.
 
 입력 소스 선택 규칙:
 
