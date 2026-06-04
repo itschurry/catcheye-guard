@@ -407,6 +407,14 @@ journalctl -u catcheye-guard-hailo.service -n 100 --no-pager
 기존 COCO 모델로 실행 검증할 때는 `0: person`이라 사람 검출은 그대로 볼 수 있다.
 단, COCO의 `1`은 `bicycle`이므로 파렛트 기능 검증은 파렛트 학습 모델로 해야 한다.
 
+Preview 표시 색상:
+
+- enabled person ROI 영역: 붉은색 계열 `RGB(220, 40, 40)` 반투명 fill
+- disabled ROI 영역: 회색 반투명 fill
+- pallet ROI 영역: 흰색 반투명 fill
+- person bbox: ROI 허용 초록, ROI 제한 빨강, ROI 오류 노랑
+- pallet bbox: 영역 안 회색, 영역 밖 자홍
+
 제약 사항:
 
 - 입력 모드 `--camera`, `--image`, `--video` 는 서로 동시에 쓸 수 없다.

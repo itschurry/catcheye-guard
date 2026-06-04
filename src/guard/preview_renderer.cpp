@@ -11,7 +11,7 @@ namespace catcheye {
 namespace {
 
 using RoiEvaluationStatus = catcheye::roi::EvaluationStatus;
-const cv::Scalar kEnabledRoiColor(0, 215, 255);
+const cv::Scalar kEnabledRoiColor(40, 40, 220);
 const cv::Scalar kDisabledRoiColor(128, 128, 128);
 const cv::Scalar kPalletRoiColor(255, 255, 255);
 const cv::Scalar kPalletPresentColor(128, 128, 128);
