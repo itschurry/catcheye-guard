@@ -84,21 +84,22 @@ docker compose -f docker/docker-compose.dev.yml up -d catcheye-guard-dev
 컨테이너 빌드:
 
 ```bash
-scripts/cmake.sh configure release-hailo
-scripts/cmake.sh build release-hailo
-scripts/cmake.sh install release-hailo
-scripts/cmake.sh verify release-hailo
+scripts/cmake.sh configure release
+scripts/cmake.sh build release
+scripts/cmake.sh install release
+scripts/cmake.sh verify release
 ```
 
 수동 빌드:
 
 ```bash
-cmake -S . -B build/release-hailo -G Ninja \
+cmake -S . -B build/release -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-cmake --build build/release-hailo -- -j$(nproc)
-cmake --install build/release-hailo --prefix install/release-hailo
+cmake --build build/release -- -j$(nproc)
+cmake --install build/release --prefix install/release
 ```
 
 ## 실행
@@ -106,23 +107,23 @@ cmake --install build/release-hailo --prefix install/release-hailo
 CSI 카메라 + WebSocket + Hailo:
 
 ```bash
-./install/release-hailo/bin/catcheye-guard \
+./install/release/bin/catcheye-guard \
   --camera \
   --ws \
-  --hef ./install/release-hailo/models/yolo26m.hef \
-  --metadata ./install/release-hailo/models/metadata.yaml
+  --hef ./install/release/models/yolo26m.hef \
+  --metadata ./install/release/models/metadata.yaml
 ```
 
 설치 패키지의 실행 스크립트:
 
 ```bash
-./install/release-hailo/scripts/run-hailo.sh
+./install/release/scripts/run-hailo.sh
 ```
 
 뷰어 전용:
 
 ```bash
-./install/release-hailo/bin/catcheye-guard \
+./install/release/bin/catcheye-guard \
   --viewer-only \
   --camera \
   --ws
@@ -131,7 +132,7 @@ CSI 카메라 + WebSocket + Hailo:
 이미지 파일 입력:
 
 ```bash
-./install/release-hailo/bin/catcheye-guard \
+./install/release/bin/catcheye-guard \
   --image ./frame.jpg \
   --ws \
   --hef ./models/yolo26m.hef \
@@ -141,7 +142,7 @@ CSI 카메라 + WebSocket + Hailo:
 ROI 파일을 직접 지정:
 
 ```bash
-./install/release-hailo/bin/catcheye-guard \
+./install/release/bin/catcheye-guard \
   --camera \
   --ws \
   --hef ./models/yolo26m.hef \

@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROFILE="${1:-release-hailo}"
+PROFILE="${1:-release}"
 CONTAINER_WORKDIR="${CATCHEYE_GUARD_CONTAINER_WORKDIR:-/home/user/catcheye-guard}"
 HOST_WORKDIR="${CATCHEYE_GUARD_HOST_WORKDIR:-$(pwd -P)}"
 
 case "$PROFILE" in
   debug) BUILD_DIR="build/debug" ;;
   release) BUILD_DIR="build/release" ;;
-  release-hailo) BUILD_DIR="build/release-hailo" ;;
   *) echo "unknown profile: $PROFILE" >&2; exit 2 ;;
 esac
 
