@@ -21,7 +21,7 @@ Commands:
 Profiles:
   debug
   release
-  release-hailo (default)
+  release-hailo (default, HailoRT)
 
 Examples:
   scripts/cmake.sh build
@@ -68,7 +68,7 @@ configure_args() {
   case "$profile" in
     debug) echo "-DCMAKE_BUILD_TYPE=Debug" ;;
     release) echo "-DCMAKE_BUILD_TYPE=Release" ;;
-    release-hailo) echo "-DCMAKE_BUILD_TYPE=Release -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON" ;;
+    release-hailo) echo "-DCMAKE_BUILD_TYPE=Release" ;;
     *) echo "unknown profile: $profile" >&2; exit 2 ;;
   esac
 }

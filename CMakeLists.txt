@@ -11,7 +11,6 @@ project(catcheye-guard
 # ---------------------------------------------------------------------------
 option(CATCHEYE_GUARD_BUILD_TESTS "Build tests" OFF)
 option(CATCHEYE_GUARD_BUILD_APP "Build main executable if src/main.cpp exists" ON)
-option(CATCHEYE_GUARD_BUNDLE_NCNN "Install the ncnn runtime library with the app" ON)
 
 # ---------------------------------------------------------------------------
 # C++ standard
@@ -55,6 +54,7 @@ if(NOT EXISTS "${CATCHEYE_VISION_SDK_SOURCE_DIR}/CMakeLists.txt")
 endif()
 
 set(CATCHEYE_VISION_SDK_BUILD_TESTS OFF CACHE BOOL "Build tests for SDK libraries" FORCE)
+set(CATCHEYE_VISION_DETECTION_ENABLE_HAILO ON CACHE BOOL "Build HailoRT detector backend" FORCE)
 
 find_package(OpenMP REQUIRED COMPONENTS CXX)
 
@@ -330,38 +330,6 @@ install(PROGRAMS
 install(FILES scripts/catcheye-guard-hailo.service
     DESTINATION scripts
 )
-
-if(CATCHEYE_GUARD_BUNDLE_NCNN)
-    set(CATCHEYE_NCNN_LIBRARIES)
-    set(CATCHEYE_NCNN_LIBRARY_DIRS)
-    if(CMAKE_LIBRARY_ARCHITECTURE)
-        list(APPEND CATCHEYE_NCNN_LIBRARY_DIRS
-            "/usr/local/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
-            "/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
-        )
-    endif()
-    list(APPEND CATCHEYE_NCNN_LIBRARY_DIRS
-        "/usr/local/lib"
-        "/usr/lib"
-    )
-
-    foreach(ncnn_library_dir IN LISTS CATCHEYE_NCNN_LIBRARY_DIRS)
-        if(EXISTS "${ncnn_library_dir}")
-            file(GLOB ncnn_libraries
-                "${ncnn_library_dir}/libncnn*.so"
-                "${ncnn_library_dir}/libncnn*.so.*"
-            )
-            list(APPEND CATCHEYE_NCNN_LIBRARIES ${ncnn_libraries})
-        endif()
-    endforeach()
-
-    if(CATCHEYE_NCNN_LIBRARIES)
-        list(REMOVE_DUPLICATES CATCHEYE_NCNN_LIBRARIES)
-        install(FILES ${CATCHEYE_NCNN_LIBRARIES}
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        )
-    endif()
-endif()
 
 install(EXPORT catcheye_guard_targets
     FILE catcheye_guard_targets.cmake

@@ -14,7 +14,6 @@
 #include "catcheye/roi/roi_repository.hpp"
 #include "catcheye/roi/roi_validation.hpp"
 #include "catcheye/runtime/frame_processing_runner.hpp"
-#include "catcheye/transport/rtsp_publisher.hpp"
 #include "catcheye/utils/logger.hpp"
 #include "guard/http_api_server.hpp"
 #include "guard/processor.hpp"
@@ -31,7 +30,7 @@ constexpr int DEFAULT_CAMERA_HEIGHT = 1296;
 void print_usage() {
     std::cout << "Usage:\n"
               << "  catcheye-guard [options]\n"
-              << "  catcheye-guard [options] <ncnn.param> <ncnn.bin> [metadata.yaml] [roi.json]\n"
+              << "  catcheye-guard [options] [roi.json]\n"
               << "\n"
               << "Options:\n"
               << "  -h, --help                  Show this help\n"
@@ -42,14 +41,11 @@ void print_usage() {
               << "  --camera-device <path>      Use camera device path\n"
               << "  --camera-width <pixels>     Camera width (default: 2304 for default CSI pipeline)\n"
               << "  --camera-height <pixels>    Camera height (default: 1296 for default CSI pipeline)\n"
-              << "  --viewer-only               Disable detection; valid only with --camera and --rtsp or --ws\n"
-              << "  --rtsp [port]               Publish annotated frames over RTSP (default port: 8554)\n"
+              << "  --viewer-only               Disable detection; valid only with --camera and --ws\n"
               << "  --ws [port]                 Publish frames over WebSocket (default port: 8080)\n"
               << "  --http-port <port>          HTTP API port (default: 8090)\n"
-              << "  --detector <name>           Detector backend: ncnn | hailo (default: ncnn)\n"
               << "  --hef <path>                Hailo HEF model path\n"
-              << "  --metadata <path>           Detector metadata YAML path; overrides positional metadata\n"
-              << "  --num-threads <count>       NCNN inference threads (default: 2)\n"
+              << "  --metadata <path>           Detector metadata YAML path\n"
               << "  --pallet-roi <path>         Pallet ROI config path\n"
               << "  --pallet-class-id <id>      Pallet class id (default: 1)\n"
               << "  --roi-alert-gpio <line>     ROI alert GPIO line; -1 disables output (default: 14)\n"
@@ -61,14 +57,12 @@ void print_usage() {
               << "Examples:\n"
               << "  catcheye-guard --help\n"
               << "  catcheye-guard --camera --ws\n"
-              << "  catcheye-guard --camera --rtsp 8554 --detector hailo --hef models/yolo26m.hef\n"
-              << "  catcheye-guard --image samples/frame.jpg --ws models/yolo26n_ncnn_model/model.ncnn.param models/yolo26n_ncnn_model/model.ncnn.bin\n";
+              << "  catcheye-guard --camera --ws --hef models/yolo26m.hef --metadata models/metadata.yaml\n"
+              << "  catcheye-guard --image samples/frame.jpg --ws --hef models/yolo26m.hef --metadata models/metadata.yaml\n";
 }
 
 const char* publisher_name(PublisherType type) {
     switch (type) {
-    case PublisherType::Rtsp:
-        return "rtsp";
     case PublisherType::WebSocket:
         return "websocket";
     case PublisherType::None:
@@ -124,16 +118,6 @@ bool is_input_mode(std::string_view arg) {
     return arg == "--image" || arg == "--video" || arg == "--camera";
 }
 
-catcheye::DetectorBackend parse_detector_backend(std::string_view value) {
-    if (value == "ncnn") {
-        return catcheye::DetectorBackend::Ncnn;
-    }
-    if (value == "hailo") {
-        return catcheye::DetectorBackend::Hailo;
-    }
-    throw std::invalid_argument("unknown detector backend: " + std::string(value));
-}
-
 std::string_view read_required_value(std::span<char* const> args, std::size_t& index, std::string_view flag) {
     if (index + 1 >= args.size()) {
         throw std::invalid_argument(std::string(flag) + " requires a value");
@@ -141,21 +125,10 @@ std::string_view read_required_value(std::span<char* const> args, std::size_t& i
     return args[++index];
 }
 
-const char* detector_backend_name(catcheye::DetectorBackend backend) {
-    switch (backend) {
-    case catcheye::DetectorBackend::Ncnn:
-        return "ncnn";
-    case catcheye::DetectorBackend::Hailo:
-        return "hailo";
-    }
-    return "unknown";
-}
-
 std::string describe_runtime_mode(const AppOptions& options)
 {
-    const bool rtsp_enabled = options.publisher_type == PublisherType::Rtsp;
     const bool websocket_enabled = options.publisher_type == PublisherType::WebSocket;
-    const char* output_name = rtsp_enabled ? "rtsp output" : (websocket_enabled ? "websocket output" : "local output");
+    const char* output_name = websocket_enabled ? "websocket output" : "local output";
     const char* processing_name = options.viewer_only ? "viewer only" : "detection";
 
     if (options.input.type == catcheye::input::InputSourceType::Camera) {
@@ -215,14 +188,6 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.input.camera_width = std::stoi(std::string(read_required_value(args, i, arg)));
         } else if (arg == "--camera-height") {
             options.input.camera_height = std::stoi(std::string(read_required_value(args, i, arg)));
-        } else if (arg == "--rtsp") {
-            if (options.publisher_type != PublisherType::None) {
-                throw std::runtime_error("only one publisher can be selected at a time");
-            }
-            options.publisher_type = PublisherType::Rtsp;
-            if (i + 1 < args.size() && args[i + 1][0] != '-') {
-                options.rtsp_port = std::stoi(std::string(read_required_value(args, i, arg)));
-            }
         } else if (arg == "--ws") {
             if (options.publisher_type != PublisherType::None) {
                 throw std::runtime_error("only one publisher can be selected at a time");
@@ -231,14 +196,10 @@ AppOptions parse_app_options(int argc, char** argv) {
             if (i + 1 < args.size() && args[i + 1][0] != '-') {
                 options.websocket_port = std::stoi(std::string(read_required_value(args, i, arg)));
             }
-        } else if (arg == "--rtsp-with-preview") {
-            throw std::invalid_argument("--rtsp-with-preview is no longer supported; use --rtsp");
         } else if (arg == "--ws-with-preview") {
             throw std::invalid_argument("--ws-with-preview is no longer supported; use --ws");
         } else if (arg == "--headless") {
             throw std::invalid_argument("--headless is no longer needed; preview output is not supported");
-        } else if (arg == "--num-threads") {
-            options.num_threads = std::stoi(std::string(read_required_value(args, i, arg)));
         } else if (arg == "--http-port") {
             options.http_port = std::stoi(std::string(read_required_value(args, i, arg)));
         } else if (arg == "--roi-alert-gpio") {
@@ -251,8 +212,6 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.roi_alert_active_low = true;
         } else if (arg == "--viewer-only") {
             options.viewer_only = true;
-        } else if (arg == "--detector") {
-            options.detector_backend = parse_detector_backend(read_required_value(args, i, arg));
         } else if (arg == "--hef") {
             options.hef_path = read_required_value(args, i, arg);
         } else if (arg == "--metadata") {
@@ -317,7 +276,7 @@ AppOptions parse_app_options(int argc, char** argv) {
     }
 
     if ((options.input.camera_width % 2) != 0 || (options.input.camera_height % 2) != 0) {
-        throw std::runtime_error("camera dimensions must be even for NV12/RTSP output");
+        throw std::runtime_error("camera dimensions must be even for NV12 output");
     }
 
     if (options.input.type == catcheye::input::InputSourceType::Camera &&
@@ -333,7 +292,7 @@ AppOptions parse_app_options(int argc, char** argv) {
             throw std::runtime_error("--viewer-only is only valid with --camera");
         }
         if (options.publisher_type == PublisherType::None) {
-            throw std::runtime_error("--viewer-only requires --rtsp or --ws");
+            throw std::runtime_error("--viewer-only requires --ws");
         }
         if (!options.hef_path.empty() || !options.metadata_path.empty() || !options.positional_args.empty()) {
             throw std::runtime_error("model, metadata, and ROI path arguments are not used with --viewer-only");
@@ -354,10 +313,8 @@ AppOptions parse_app_options(int argc, char** argv) {
 
 DefaultPaths resolve_default_paths(const char* executable_path) {
     return DefaultPaths{
-        .param_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/model.ncnn.param"),
-        .bin_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/model.ncnn.bin"),
-        .metadata_path = resolve_default_model_path(executable_path, "yolo26n_ncnn_model/metadata.yaml"),
-        .hef_path = {},
+        .metadata_path = resolve_default_model_path(executable_path, "metadata.yaml"),
+        .hef_path = resolve_default_model_path(executable_path, "yolo26m.hef"),
         .roi_config_path = resolve_default_config_path(executable_path, "roi_cam_default.json"),
         .pallet_roi_config_path = resolve_default_config_path(executable_path, "pallet_roi_cam_default.json"),
     };
@@ -389,19 +346,7 @@ AppBootstrap build_app_bootstrap(
     AppBootstrap bootstrap;
 
     bootstrap.processor_config.detection_enabled = !options.viewer_only;
-    bootstrap.processor_config.detector.backend = options.detector_backend;
-
-    auto& ncnn_cfg = bootstrap.processor_config.detector.ncnn;
-    ncnn_cfg.param_path = default_paths.param_path;
-    ncnn_cfg.bin_path = default_paths.bin_path;
-    ncnn_cfg.metadata_path = options.metadata_path.empty() ? default_paths.metadata_path : options.metadata_path;
-    ncnn_cfg.num_threads = options.num_threads;
-    ncnn_cfg.allowed_class_ids = {0, options.pallet_class_id};
-
-    // positional args override (기존 동작 유지)
-    if (!options.positional_args.empty()) ncnn_cfg.param_path = options.positional_args[0];
-    if (options.positional_args.size() > 1) ncnn_cfg.bin_path = options.positional_args[1];
-    if (options.positional_args.size() > 2 && options.metadata_path.empty()) ncnn_cfg.metadata_path = options.positional_args[2];
+    bootstrap.processor_config.detector.backend = catcheye::DetectorBackend::Hailo;
 
     auto& hailo_cfg = bootstrap.processor_config.detector.hailo;
     hailo_cfg.hef_path = options.hef_path.empty() ? default_paths.hef_path : options.hef_path;
@@ -426,16 +371,10 @@ AppBootstrap build_app_bootstrap(
 
     bootstrap.runtime_config.process_every_n_frames = 2;
     bootstrap.publisher_type = options.publisher_type;
-    bootstrap.rtsp_publisher_config.port = options.rtsp_port;
-    bootstrap.rtsp_publisher_config.width = options.input.camera_width;
-    bootstrap.rtsp_publisher_config.height = options.input.camera_height;
     bootstrap.websocket_publisher_config.port = options.websocket_port;
     bootstrap.http_api_server_config.port = options.http_port;
 
-    if (!options.viewer_only && options.detector_backend == catcheye::DetectorBackend::Ncnn && (ncnn_cfg.param_path.empty() || ncnn_cfg.bin_path.empty())) {
-        throw std::runtime_error("NCNN model paths are required");
-    }
-    if (!options.viewer_only && options.detector_backend == catcheye::DetectorBackend::Hailo && hailo_cfg.hef_path.empty()) {
+    if (!options.viewer_only && hailo_cfg.hef_path.empty()) {
         throw std::runtime_error("Hailo HEF path is required; pass --hef <model.hef>");
     }
 
@@ -451,7 +390,10 @@ int run_app(int argc, char** argv) {
     }
 
     const DefaultPaths default_paths = resolve_default_paths(argv[0]);
-    const std::string roi_config_path = options.positional_args.size() > 3 ? options.positional_args[3] : default_paths.roi_config_path;
+    if (options.positional_args.size() > 1) {
+        throw std::runtime_error("only one positional argument is supported: [roi.json]");
+    }
+    const std::string roi_config_path = !options.positional_args.empty() ? options.positional_args[0] : default_paths.roi_config_path;
     const std::string pallet_roi_config_path =
         options.pallet_roi_config_path.empty() ? default_paths.pallet_roi_config_path : options.pallet_roi_config_path;
     const LoadedRoiConfig loaded_roi_config = options.viewer_only ? LoadedRoiConfig{} : load_and_validate_roi_config(roi_config_path);
@@ -473,7 +415,7 @@ int run_app(int argc, char** argv) {
                       bootstrap.http_api_server_config.port);
         }
         if (bootstrap.processor_config.detection_enabled) {
-            log->info("detector backend: {}", detector_backend_name(bootstrap.processor_config.detector.backend));
+            log->info("detector backend: hailo");
         } else {
             log->info("detector disabled: viewer-only mode");
         }
@@ -487,9 +429,7 @@ int run_app(int argc, char** argv) {
     }
 
     std::unique_ptr<catcheye::transport::ResultPublisher> publisher;
-    if (bootstrap.publisher_type == PublisherType::Rtsp) {
-        publisher = std::make_unique<catcheye::transport::RtspPublisher>(bootstrap.rtsp_publisher_config);
-    } else if (bootstrap.publisher_type == PublisherType::WebSocket) {
+    if (bootstrap.publisher_type == PublisherType::WebSocket) {
         publisher = std::make_unique<catcheye::transport::WebSocketPublisher>(bootstrap.websocket_publisher_config);
     }
     auto recording_controller = std::make_unique<catcheye::RecordingController>(options.recording_dir);
