@@ -28,6 +28,46 @@ constexpr std::string_view DEFAULT_CAMERA_PIPELINE =
 constexpr int DEFAULT_CAMERA_WIDTH = 2304;
 constexpr int DEFAULT_CAMERA_HEIGHT = 1296;
 
+void print_usage() {
+    std::cout << "Usage:\n"
+              << "  catcheye-guard [options]\n"
+              << "  catcheye-guard [options] <ncnn.param> <ncnn.bin> [metadata.yaml] [roi.json]\n"
+              << "\n"
+              << "Options:\n"
+              << "  -h, --help                  Show this help\n"
+              << "  --camera                    Use camera input (default)\n"
+              << "  --image <path>              Use image file input\n"
+              << "  --video <path>              Use video file input\n"
+              << "  --camera-pipeline <pipe>    Use explicit GStreamer camera pipeline\n"
+              << "  --camera-device <path>      Use camera device path\n"
+              << "  --camera-width <pixels>     Camera width (default: 2304 for default CSI pipeline)\n"
+              << "  --camera-height <pixels>    Camera height (default: 1296 for default CSI pipeline)\n"
+              << "  --viewer-only               Disable detection; valid only with --camera and --rtsp or --ws\n"
+              << "  --rtsp [port]               Publish annotated frames over RTSP (default port: 8554)\n"
+              << "  --ws [port]                 Publish frames over WebSocket (default port: 8080)\n"
+              << "  --http-port <port>          HTTP API port (default: 8090)\n"
+              << "  --detector <name>           Detector backend: ncnn | hailo (default: ncnn)\n"
+              << "  --hef <path>                Hailo HEF model path\n"
+              << "  --metadata <path>           Detector metadata YAML path; overrides positional metadata\n"
+              << "  --num-threads <count>       NCNN inference threads (default: 2)\n"
+              << "  --pallet-roi <path>         Pallet ROI config path\n"
+              << "  --pallet-class-id <id>      Pallet class id (default: 1)\n"
+              << "  --roi-alert-gpio <line>     ROI alert GPIO line; -1 disables output (default: 14)\n"
+              << "  --roi-alert-pulse-ms <ms>   ROI alert pulse duration (default: 100)\n"
+              << "  --gpio-chip <path>          GPIO chip path (default: /dev/gpiochip4)\n"
+              << "  --roi-alert-active-low      Drive ROI alert GPIO active-low\n"
+              << "  --recording-dir <path>      Preview recording directory (default: recordings)\n"
+              << "\n"
+              << "Removed options:\n"
+              << "  --rtsp-with-preview, --ws-with-preview, --headless\n"
+              << "\n"
+              << "Examples:\n"
+              << "  catcheye-guard --help\n"
+              << "  catcheye-guard --camera --ws\n"
+              << "  catcheye-guard --camera --rtsp 8554 --detector hailo --hef models/yolo26m.hef\n"
+              << "  catcheye-guard --image samples/frame.jpg --ws models/yolo26n_ncnn_model/model.ncnn.param models/yolo26n_ncnn_model/model.ncnn.bin\n";
+}
+
 const char* publisher_name(PublisherType type) {
     switch (type) {
     case PublisherType::Rtsp:
@@ -141,7 +181,9 @@ AppOptions parse_app_options(int argc, char** argv) {
 
     for (std::size_t i = 1; i < args.size(); ++i) {
         std::string arg(args[i]);
-        if (arg == "--image" && i + 1 < args.size()) {
+        if (arg == "--help" || arg == "-h") {
+            options.show_help = true;
+        } else if (arg == "--image" && i + 1 < args.size()) {
             if (input_mode_selected) {
                 throw std::runtime_error("input mode flags are mutually exclusive");
             }
@@ -236,6 +278,10 @@ AppOptions parse_app_options(int argc, char** argv) {
         } else {
             options.positional_args.push_back(arg);
         }
+    }
+
+    if (options.show_help) {
+        return options;
     }
 
     if ((options.input.type == catcheye::input::InputSourceType::ImageFile ||
@@ -407,6 +453,11 @@ AppBootstrap build_app_bootstrap(
 
 int run_app(int argc, char** argv) {
     const AppOptions options = parse_app_options(argc, argv);
+    if (options.show_help) {
+        print_usage();
+        return 0;
+    }
+
     const DefaultPaths default_paths = resolve_default_paths(argv[0]);
     const std::string roi_config_path = options.positional_args.size() > 3 ? options.positional_args[3] : default_paths.roi_config_path;
     const std::string pallet_roi_config_path =

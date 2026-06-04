@@ -21,6 +21,7 @@ enum class PublisherType {
 };
 
 struct AppOptions {
+    bool show_help = false;
     catcheye::input::InputSourceConfig input;
     PublisherType publisher_type = PublisherType::None;
     int rtsp_port = 8554;

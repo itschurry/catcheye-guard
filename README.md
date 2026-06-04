@@ -325,6 +325,12 @@ cd /opt/catcheye-guard
 ./bin/catcheye-guard --camera --ws
 ```
 
+실행 옵션 도움말:
+
+```bash
+./bin/catcheye-guard --help
+```
+
 Hailo 설치 결과물을 홈 디렉터리 기준으로 바로 실행할 때:
 
 ```bash
@@ -375,6 +381,7 @@ journalctl -u catcheye-guard-hailo.service -n 100 --no-pager
 
 부가 옵션:
 
+- `-h`, `--help`: 실행 옵션 도움말을 출력한다.
 - `--rtsp [port]`: RTSP 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
 - `--ws [port]`: WebSocket 결과 송출을 켠다. 포트를 생략하면 기본 포트를 사용한다.
 - `--http-port <port>`: HTTP API 포트를 지정한다. 기본값은 `8090` 이다.
