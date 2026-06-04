@@ -22,6 +22,7 @@ class GuardProcessor final : public catcheye::runtime::FrameProcessor {
     catcheye::runtime::ProcessOutput process(const catcheye::input::Frame& frame,
                                              const catcheye::runtime::ProcessContext& context) override;
     bool update_roi_config(const catcheye::roi::CameraRoiConfig& roi_config);
+    bool update_pallet_roi_config(const catcheye::roi::CameraRoiConfig& roi_config);
 
   private:
     struct RoiSnapshot {
@@ -30,13 +31,17 @@ class GuardProcessor final : public catcheye::runtime::FrameProcessor {
     };
 
     RoiSnapshot roi_snapshot() const;
+    RoiSnapshot pallet_roi_snapshot() const;
 
     mutable std::mutex roi_mutex_;
     GuardProcessorConfig config_;
     std::unique_ptr<IDetector> detector_;
     std::unique_ptr<catcheye::hardware::GpioPulseSignal> roi_alert_signal_;
     std::vector<Detection> cached_detections_;
+    double cached_inference_ms_ = 0.0;
     bool roi_violation_active_ = false;
+    std::uint64_t last_roi_restricted_log_frame_ = 0;
+    bool has_logged_roi_restricted_ = false;
 };
 
 } // namespace catcheye

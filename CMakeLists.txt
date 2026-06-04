@@ -11,6 +11,7 @@ project(catcheye-guard
 # ---------------------------------------------------------------------------
 option(CATCHEYE_GUARD_BUILD_TESTS "Build tests" OFF)
 option(CATCHEYE_GUARD_BUILD_APP "Build main executable if src/main.cpp exists" ON)
+option(CATCHEYE_GUARD_BUNDLE_NCNN "Install the ncnn runtime library with the app" ON)
 
 # ---------------------------------------------------------------------------
 # C++ standard
@@ -55,27 +56,20 @@ endif()
 
 set(CATCHEYE_VISION_SDK_BUILD_TESTS OFF CACHE BOOL "Build tests for SDK libraries" FORCE)
 
+find_package(OpenMP REQUIRED COMPONENTS CXX)
+
 add_subdirectory(
     "${CATCHEYE_VISION_SDK_SOURCE_DIR}"
     "${CMAKE_CURRENT_BINARY_DIR}/catcheye-vision-sdk"
 )
 
-find_package(OpenCV REQUIRED COMPONENTS core imgproc dnn imgcodecs)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc dnn imgcodecs videoio)
 message(STATUS "OpenCV version: ${OpenCV_VERSION}")
 
-message(STATUS "target sysroot: ${TARGET_SYSROOT}")
-
 find_package(spdlog REQUIRED)
-find_library(GPIOD_LIBRARY gpiod)
-find_path(GPIOD_INCLUDE_DIR gpiod.h)
-if (GPIOD_LIBRARY AND GPIOD_INCLUDE_DIR)
-    message(STATUS "libgpiod found: ${GPIOD_LIBRARY}")
-else()
-    message(FATAL_ERROR
-        "libgpiod not found. Install libgpiod-dev/gpiod in the build environment and target sysroot "
-        "(for cross build):\n"
-        "  sudo apt install libgpiod-dev gpiod")
-endif()
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GPIOD REQUIRED IMPORTED_TARGET libgpiod>=2.0)
+message(STATUS "libgpiod version: ${GPIOD_VERSION}")
 
 # ---------------------------------------------------------------------------
 # Source collection
@@ -105,10 +99,6 @@ target_include_directories(catcheye_guard
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-if(GPIOD_INCLUDE_DIR)
-    target_include_directories(catcheye_guard PRIVATE ${GPIOD_INCLUDE_DIR})
-endif()
-
 target_compile_features(catcheye_guard PUBLIC cxx_std_20)
 
 target_compile_definitions(catcheye_guard
@@ -124,17 +114,14 @@ target_link_libraries(catcheye_guard
         catcheye::vision_protocol
         catcheye::vision_runtime
         catcheye::vision_transport
+        catcheye::vision_visualization
+        catcheye::vision_http
         ${OpenCV_LIBS}
         lapack
         blas
         spdlog::spdlog
+        PkgConfig::GPIOD
 )
-
-if(GPIOD_LIBRARY)
-    target_link_libraries(catcheye_guard PUBLIC ${GPIOD_LIBRARY})
-endif()
-
-target_compile_definitions(catcheye_guard PUBLIC CATCHEYE_HAS_LIBGPIOD=1)
 
 set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
@@ -253,6 +240,20 @@ install(TARGETS catcheye_vision_runtime
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+install(TARGETS catcheye_vision_visualization
+    EXPORT catcheye_guard_targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(TARGETS catcheye_vision_http
+    EXPORT catcheye_guard_targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
 install(TARGETS catcheye_guard
     EXPORT catcheye_guard_targets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -298,6 +299,14 @@ install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-runtime/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
+install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-visualization/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-http/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
 install(
     DIRECTORY models
     DESTINATION ${CMAKE_INSTALL_DATADIR}/..
@@ -305,82 +314,53 @@ install(
     PATTERN "*.pyc" EXCLUDE
 )
 
-if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}/usr/lib")
-    install(
-        DIRECTORY "${TARGET_SYSROOT}/usr/lib/"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        FILES_MATCHING
-        PATTERN "libncnn*.so"
-        PATTERN "libncnn*.so.*"
-        PATTERN "libncnn*.a"
-        PATTERN "libhailort*.so"
-        PATTERN "libhailort*.so.*"
-    )
-else()
-    message(WARNING "TARGET_SYSROOT/usr/lib not found; ncnn/HailoRT libraries will not be copied into the install tree")
-endif()
+install(
+    DIRECTORY config
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/..
+    PATTERN "__pycache__" EXCLUDE
+    PATTERN "*.pyc" EXCLUDE
+)
 
-if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu")
-    install(
-        DIRECTORY "${TARGET_SYSROOT}/usr/lib/aarch64-linux-gnu/"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        FILES_MATCHING
-        PATTERN "libopencv*.so"
-        PATTERN "libopencv*.so.*"
-        PATTERN "libyaml-cpp*.so"
-        PATTERN "libyaml-cpp*.so.*"
-        PATTERN "libspdlog*.so"
-        PATTERN "libspdlog*.so.*"
-        PATTERN "libfmt*.so"
-        PATTERN "libfmt*.so.*"
-        PATTERN "libtbb*.so"
-        PATTERN "libtbb*.so.*"
-        PATTERN "libgomp*.so"
-        PATTERN "libgomp*.so.*"
-        PATTERN "libjpeg*.so"
-        PATTERN "libjpeg*.so.*"
-        PATTERN "libwebp*.so"
-        PATTERN "libwebp*.so.*"
-        PATTERN "libpng*.so"
-        PATTERN "libpng*.so.*"
-        PATTERN "libgdcm*.so"
-        PATTERN "libgdcm*.so.*"
-        PATTERN "libcharls*.so"
-        PATTERN "libcharls*.so.*"
-        PATTERN "libtiff*.so"
-        PATTERN "libtiff*.so.*"
-        PATTERN "libopenjp2*.so"
-        PATTERN "libopenjp2*.so.*"
-        PATTERN "libOpenEXR*.so"
-        PATTERN "libOpenEXR*.so.*"
-        PATTERN "libIex*.so"
-        PATTERN "libIex*.so.*"
-        PATTERN "libIlmThread*.so"
-        PATTERN "libIlmThread*.so.*"
-        PATTERN "libImath*.so"
-        PATTERN "libImath*.so.*"
-        PATTERN "libLerc*.so"
-        PATTERN "libLerc*.so.*"
-        PATTERN "libjbig*.so"
-        PATTERN "libjbig*.so.*"
-        PATTERN "libdeflate*.so"
-        PATTERN "libdeflate*.so.*"
-        PATTERN "libgdal*.so"
-        PATTERN "libgdal*.so.*"
-    )
-else()
-    message(WARNING "TARGET_SYSROOT runtime libraries not found; bundled third-party runtime libs will be incomplete")
-endif()
+install(PROGRAMS 
+    scripts/run.sh
+    scripts/run-hailo.sh
+    DESTINATION scripts
+)
 
-if(DEFINED TARGET_SYSROOT AND EXISTS "${TARGET_SYSROOT}" AND CMAKE_READELF)
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/install-runtime-closure.cmake.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/install-runtime-closure.cmake"
-        @ONLY
+install(FILES scripts/catcheye-guard-hailo.service
+    DESTINATION scripts
+)
+
+if(CATCHEYE_GUARD_BUNDLE_NCNN)
+    set(CATCHEYE_NCNN_LIBRARIES)
+    set(CATCHEYE_NCNN_LIBRARY_DIRS)
+    if(CMAKE_LIBRARY_ARCHITECTURE)
+        list(APPEND CATCHEYE_NCNN_LIBRARY_DIRS
+            "/usr/local/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
+            "/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
+        )
+    endif()
+    list(APPEND CATCHEYE_NCNN_LIBRARY_DIRS
+        "/usr/local/lib"
+        "/usr/lib"
     )
-    install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/install-runtime-closure.cmake")
-else()
-    message(WARNING "Runtime dependency closure copy is disabled because TARGET_SYSROOT or CMAKE_READELF is missing")
+
+    foreach(ncnn_library_dir IN LISTS CATCHEYE_NCNN_LIBRARY_DIRS)
+        if(EXISTS "${ncnn_library_dir}")
+            file(GLOB ncnn_libraries
+                "${ncnn_library_dir}/libncnn*.so"
+                "${ncnn_library_dir}/libncnn*.so.*"
+            )
+            list(APPEND CATCHEYE_NCNN_LIBRARIES ${ncnn_libraries})
+        endif()
+    endforeach()
+
+    if(CATCHEYE_NCNN_LIBRARIES)
+        list(REMOVE_DUPLICATES CATCHEYE_NCNN_LIBRARIES)
+        install(FILES ${CATCHEYE_NCNN_LIBRARIES}
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        )
+    endif()
 endif()
 
 install(EXPORT catcheye_guard_targets

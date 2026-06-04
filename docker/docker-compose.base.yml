@@ -1,12 +1,11 @@
 services:
   robot-base:
-    env_file:
-      - .env
+    platform: linux/arm64
     build:
       context: ..
       dockerfile: docker/Dockerfile
       args:
-        UID: ${UID:-1000}
-        GID: ${GID:-1000}
-        USERNAME: ${USER:-appuser}
-        HOME: ${HOME:-/home/${USER:-appuser}}
+        UID: 1000
+        GID: 1000
+        USERNAME: user
+        HOME: /home/user

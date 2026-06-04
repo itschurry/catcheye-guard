@@ -7,12 +7,12 @@
       "command": "bash",
       "args": [
         "-c",
-        "cmake -S . -B build/debug -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchains/aarch64-linux-gnu.cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug -DTARGET_SYSROOT=/opt/sysroots/raspi"
+        "cmake -S . -B build/debug -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug"
       ],
       "problemMatcher": [],
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       }
     },
     {
@@ -21,12 +21,26 @@
       "command": "bash",
       "args": [
         "-c",
-        "cmake -S . -B build/release -G Ninja -DCMAKE_TOOLCHAIN_FILE=toolchains/aarch64-linux-gnu.cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DTARGET_SYSROOT=/opt/sysroots/raspi -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON"
+        "cmake -S . -B build/release -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release"
       ],
       "problemMatcher": [],
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
+      }
+    },
+    {
+      "label": "cmake: configure[Release,Hailo]",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "cmake -S . -B build/release-hailo -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON"
+      ],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       }
     },
     {
@@ -40,7 +54,7 @@
       "problemMatcher": [],
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       }
     },
     {
@@ -54,7 +68,21 @@
       "problemMatcher": [],
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
+      }
+    },
+    {
+      "label": "cmake: build[Release,Hailo]",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "cmake --build build/release-hailo --config Release -- -j $(nproc) && ln -sf $(realpath build/release-hailo/compile_commands.json) build/compile_commands.json"
+      ],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       }
     },
     {
@@ -63,7 +91,7 @@
       "command": "rm -rf build install log",
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       }
     },
     {
@@ -72,25 +100,34 @@
       "command": "rm -rf build/debug/${input:pkgName} build/release/${input:pkgName} install/${input:pkgName} log/latest_build/${input:pkgName}",
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       }
     },
     {
       "label": "cmake: install[Debug]",
       "type": "shell",
-      "command": "cmake --install build/debug --prefix install/debug",
+      "command": "rm -rf install/debug && cmake --install build/debug --prefix install/debug",
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
       }
     },
     {
       "label": "cmake: install[Release]",
       "type": "shell",
-      "command": "cmake --install build/release --prefix install/release",
+      "command": "rm -rf install/release && cmake --install build/release --prefix install/release",
       "group": {
         "kind": "build",
-        "isDefault": true
+        "isDefault": false
+      }
+    },
+    {
+      "label": "cmake: install[Release,Hailo]",
+      "type": "shell",
+      "command": "rm -rf install/release-hailo && cmake --install build/release-hailo --prefix install/release-hailo",
+      "group": {
+        "kind": "build",
+        "isDefault": false
       }
     }
   ],
