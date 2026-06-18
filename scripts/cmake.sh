@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONTAINER="${CATCHEYE_GUARD_CONTAINER:-catcheye-guard-develop-raspbian}"
-WORKDIR="${CATCHEYE_GUARD_CONTAINER_WORKDIR:-/home/user/catcheye-guard}"
+WORKDIR="${WORKDIR:-${CATCHEYE_GUARD_CONTAINER_WORKDIR:-/home/user/catcheye-guard}}"
+host_arch="$(uname -m)"
+case "${DOCKER_ARCH:-$host_arch}" in
+  x86_64|amd64) arch="amd64" ;;
+  aarch64|arm64) arch="arm64" ;;
+  *) echo "unknown arch: ${DOCKER_ARCH:-$host_arch}" >&2; exit 2 ;;
+esac
+
+CONTAINER="${CONTAINER:-catcheye-guard-develop-arm64}"
+if [[ -z "$CONTAINER" ]]; then
+  case "$arch" in
+    amd64) CONTAINER="catcheye-guard-develop-amd64" ;;
+    arm64) CONTAINER="catcheye-guard-develop-arm64" ;;
+  esac
+fi
 
 usage() {
   cat <<'EOF'
@@ -25,6 +38,8 @@ Profiles:
 Examples:
   scripts/cmake.sh build
   scripts/cmake.sh all release
+  DOCKER_ARCH=arm64 scripts/cmake.sh build
+  DOCKER_ARCH=arm64 CONTAINER=catcheye-guard-develop-arm64 scripts/cmake.sh all
   scripts/cmake.sh clean
 EOF
 }
@@ -39,16 +54,16 @@ fi
 
 build_dir() {
   case "$profile" in
-    debug) echo "build/debug" ;;
-    release) echo "build/release" ;;
+    debug) echo "build/debug-$arch" ;;
+    release) echo "build/release-$arch" ;;
     *) echo "unknown profile: $profile" >&2; exit 2 ;;
   esac
 }
 
 install_dir() {
   case "$profile" in
-    debug) echo "install/debug" ;;
-    release) echo "install/release" ;;
+    debug) echo "install/debug-$arch" ;;
+    release) echo "install/release-$arch" ;;
     *) echo "unknown profile: $profile" >&2; exit 2 ;;
   esac
 }
@@ -62,9 +77,11 @@ config_name() {
 }
 
 configure_args() {
-  case "$profile" in
-    debug) echo "-DCMAKE_BUILD_TYPE=Debug" ;;
-    release) echo "-DCMAKE_BUILD_TYPE=Release -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON" ;;
+  case "$arch:$profile" in
+    amd64:debug) echo "-DCMAKE_BUILD_TYPE=Debug -DCATCHEYE_GUARD_ENABLE_LIBCAMERA=OFF -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=OFF" ;;
+    amd64:release) echo "-DCMAKE_BUILD_TYPE=Release -DCATCHEYE_GUARD_ENABLE_LIBCAMERA=OFF -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=OFF" ;;
+    arm64:debug) echo "-DCMAKE_BUILD_TYPE=Debug -DCATCHEYE_GUARD_ENABLE_LIBCAMERA=ON -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON" ;;
+    arm64:release) echo "-DCMAKE_BUILD_TYPE=Release -DCATCHEYE_GUARD_ENABLE_LIBCAMERA=ON -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON" ;;
     *) echo "unknown profile: $profile" >&2; exit 2 ;;
   esac
 }
@@ -79,7 +96,7 @@ configure() {
 
 build() {
   in_container "cmake --build '$(build_dir)' --config '$(config_name)' -- -j \$(nproc)"
-  scripts/sync-compile-commands.sh "$profile"
+  scripts/sync-compile-commands.sh "$profile" "$arch"
 }
 
 install_app() {
@@ -97,7 +114,7 @@ clean() {
 case "$command" in
   configure) configure ;;
   build) build ;;
-  compile-db) scripts/sync-compile-commands.sh "$profile" ;;
+  compile-db) scripts/sync-compile-commands.sh "$profile" "$arch" ;;
   install) install_app ;;
   verify) verify ;;
   clean) clean ;;

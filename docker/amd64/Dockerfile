@@ -67,7 +67,7 @@ RUN set -eux; \
       'export CMAKE_PREFIX_PATH=/usr/local:/usr${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}' \
       >> ~/.bashrc; \
     printf '%s\n' \
-      'alias cm="cmake -S . -B build/release-amd64 -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DCATCHEYE_PICK_ENABLE_LIBCAMERA=OFF -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=OFF && cmake --build build/release-amd64 --config Release -- -j $(nproc) && mkdir -p build && ln -sf $(realpath build/release-amd64/compile_commands.json) build/compile_commands.json"' \
+      'alias cm="cmake -S . -B build/release-amd64 -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DCATCHEYE_GUARD_ENABLE_LIBCAMERA=OFF -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=OFF && cmake --build build/release-amd64 --config Release -- -j $(nproc) && mkdir -p build && ln -sf $(realpath build/release-amd64/compile_commands.json) build/compile_commands.json"' \
       'alias ci="rm -rf install/release-amd64 && cmake --install build/release-amd64 --prefix install/release-amd64"' \
       'alias cc="rm -rf build install && find log -mindepth 1 ! -name .gitkeep -delete"' \
       > ~/.bash_aliases

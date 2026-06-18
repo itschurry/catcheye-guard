@@ -12,6 +12,15 @@ project(catcheye-guard
 option(CATCHEYE_GUARD_BUILD_TESTS "Build tests" OFF)
 option(CATCHEYE_GUARD_BUILD_APP "Build main executable if src/main.cpp exists" ON)
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set(CATCHEYE_GUARD_HARDWARE_DEFAULT ON)
+else()
+    set(CATCHEYE_GUARD_HARDWARE_DEFAULT OFF)
+endif()
+
+option(CATCHEYE_GUARD_ENABLE_LIBCAMERA "Build Raspberry Pi libcamera input backend" ${CATCHEYE_GUARD_HARDWARE_DEFAULT})
+option(CATCHEYE_VISION_DETECTION_ENABLE_HAILO "Build HailoRT detector backend" ${CATCHEYE_GUARD_HARDWARE_DEFAULT})
+
 # ---------------------------------------------------------------------------
 # C++ standard
 # ---------------------------------------------------------------------------
@@ -54,7 +63,7 @@ if(NOT EXISTS "${CATCHEYE_VISION_SDK_SOURCE_DIR}/CMakeLists.txt")
 endif()
 
 set(CATCHEYE_VISION_SDK_BUILD_TESTS OFF CACHE BOOL "Build tests for SDK libraries" FORCE)
-set(CATCHEYE_VISION_DETECTION_ENABLE_HAILO ON CACHE BOOL "Build HailoRT detector backend" FORCE)
+set(CATCHEYE_VISION_INPUT_ENABLE_LIBCAMERA ${CATCHEYE_GUARD_ENABLE_LIBCAMERA} CACHE BOOL "Build libcamera input backend" FORCE)
 
 find_package(OpenMP REQUIRED COMPONENTS CXX)
 
@@ -275,9 +284,16 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-input/include/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
+if(CATCHEYE_GUARD_ENABLE_LIBCAMERA)
+    install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-input/include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+else()
+    install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-input/include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        PATTERN "libcamera_source.hpp" EXCLUDE
+    )
+endif()
 
 install(DIRECTORY ${CATCHEYE_VISION_SDK_SOURCE_DIR}/libs/vision-detection/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}

@@ -2,6 +2,11 @@
 
 Raspberry Pi ARM64 + Hailo 환경에서 카메라 프레임을 처리하고, 사람/파렛트 검출 결과를 ROI 규칙으로 판정하는 감시 애플리케이션이다.
 
+지원 빌드 환경:
+
+- `amd64`: 개발 PC용. 기본 빌드는 `libcamera`, `HailoRT` 없이 빌드한다.
+- `arm64`: Raspberry Pi + Hailo 하드웨어용. 기본 빌드는 `libcamera`, `HailoRT`를 켠다.
+
 ## 목적
 
 - 카메라, 이미지, 동영상 입력 처리
@@ -28,9 +33,14 @@ Raspberry Pi ARM64 + Hailo 환경에서 카메라 프레임을 처리하고, 사
 │   ├── roi_cam_default.json
 │   └── pallet_roi_cam_default.json
 ├── docker/
-│   ├── Dockerfile
-│   ├── docker-compose.base.yml
-│   └── docker-compose.dev.yml
+│   ├── amd64/
+│   │   ├── Dockerfile
+│   │   ├── docker-compose.base.yml
+│   │   └── docker-compose.dev.yml
+│   └── arm64/
+│       ├── Dockerfile
+│       ├── docker-compose.base.yml
+│       └── docker-compose.dev.yml
 ├── models/
 │   ├── yolo26m.hef
 │   └── metadata.yaml
@@ -73,12 +83,25 @@ ls -l /dev/hailo*
 
 ## 빌드
 
-개발 PC에서 ARM64 컨테이너를 쓸 때:
+amd64 개발 컨테이너:
+
+```bash
+docker compose -f docker/amd64/docker-compose.dev.yml build
+docker compose -f docker/amd64/docker-compose.dev.yml up -d catcheye-guard-develop-amd64
+```
+
+amd64 호스트에서 arm64 컨테이너를 빌드하거나 실행하기 전에는 QEMU binfmt를 먼저 등록한다.
+이 작업이 없으면 arm64 이미지 빌드 중 `exec /bin/bash: exec format error`가 난다.
 
 ```bash
 docker run --privileged --rm tonistiigi/binfmt --install arm64
-docker compose -f docker/docker-compose.dev.yml build
-docker compose -f docker/docker-compose.dev.yml up -d catcheye-guard-dev
+```
+
+arm64 하드웨어 컨테이너:
+
+```bash
+docker compose -f docker/arm64/docker-compose.dev.yml build
+docker compose -f docker/arm64/docker-compose.dev.yml up -d catcheye-guard-develop-arm64
 ```
 
 컨테이너 빌드:
@@ -90,44 +113,61 @@ scripts/cmake.sh install release
 scripts/cmake.sh verify release
 ```
 
-`build/release/compile_commands.json`은 컨테이너 경로 기준이다.
+arm64 컨테이너를 명시해서 빌드:
+
+```bash
+DOCKER_ARCH=arm64 scripts/cmake.sh build release
+```
+
+`build/release-amd64/compile_commands.json` 또는 `build/release-arm64/compile_commands.json`은 컨테이너 경로 기준이다.
 `build/compile_commands.json`은 macOS 호스트 경로 기준으로 변환된 파일이다.
 프로젝트 루트에는 `compile_commands.json`을 만들지 않는다.
 
 수동 빌드:
 
 ```bash
-cmake -S . -B build/release -G Ninja \
+cmake -S . -B build/release-amd64 -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON \
+  -DCATCHEYE_GUARD_ENABLE_LIBCAMERA=OFF \
+  -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=OFF \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-cmake --build build/release -- -j$(nproc)
-cmake --install build/release --prefix install/release
+cmake -S . -B build/release-arm64 -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCATCHEYE_GUARD_ENABLE_LIBCAMERA=ON \
+  -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 ```
+
+주요 CMake 옵션:
+
+- `CATCHEYE_GUARD_ENABLE_LIBCAMERA`: libcamera 입력 백엔드 빌드 여부다. amd64 기본값은 `OFF`, arm64 기본값은 `ON`이다.
+- `CATCHEYE_VISION_DETECTION_ENABLE_HAILO`: HailoRT detector 백엔드 빌드 여부다. amd64 기본값은 `OFF`, arm64 기본값은 `ON`이다.
+- `CATCHEYE_GUARD_BUILD_APP`: 실행 파일 빌드 여부다. 기본값은 `ON`이다.
+- `CATCHEYE_GUARD_BUILD_TESTS`: 테스트 빌드 여부다. 기본값은 `OFF`다.
 
 ## 실행
 
 CSI 카메라 + WebSocket + Hailo:
 
 ```bash
-./install/release/bin/catcheye-guard \
+./install/release-arm64/bin/catcheye-guard \
   --camera \
   --ws \
-  --hef ./install/release/models/yolo26m.hef \
-  --metadata ./install/release/models/metadata.yaml
+  --hef ./install/release-arm64/models/yolo26m.hef \
+  --metadata ./install/release-arm64/models/metadata.yaml
 ```
 
 설치 패키지의 실행 스크립트:
 
 ```bash
-./install/release/scripts/run-hailo.sh
+./install/release-arm64/scripts/run-hailo.sh
 ```
 
 뷰어 전용:
 
 ```bash
-./install/release/bin/catcheye-guard \
+./install/release-arm64/bin/catcheye-guard \
   --viewer-only \
   --camera \
   --ws
@@ -136,7 +176,7 @@ CSI 카메라 + WebSocket + Hailo:
 이미지 파일 입력:
 
 ```bash
-./install/release/bin/catcheye-guard \
+./install/release-arm64/bin/catcheye-guard \
   --image ./frame.jpg \
   --ws \
   --hef ./models/yolo26m.hef \
@@ -146,7 +186,7 @@ CSI 카메라 + WebSocket + Hailo:
 ROI 파일을 직접 지정:
 
 ```bash
-./install/release/bin/catcheye-guard \
+./install/release-arm64/bin/catcheye-guard \
   --camera \
   --ws \
   --hef ./models/yolo26m.hef \

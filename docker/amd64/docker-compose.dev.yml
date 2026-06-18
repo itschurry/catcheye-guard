@@ -11,7 +11,7 @@ services:
     environment:
       - BUILD_TYPE=develop
     volumes:
-      - ../:/home/user/catcheye-guard:rw
+      - ../../:/home/user/catcheye-guard:rw
       - ${HOME}/shared:/mnt/shared:rw
       - ${HOME}/.ssh:/home/user/.ssh:ro
       # - vscode_server:/home/user/.vscode-server:rw

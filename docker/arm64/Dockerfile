@@ -72,7 +72,7 @@ RUN set -eux; \
       'export GST_PLUGIN_PATH="/usr/local/lib/${multiarch}/gstreamer-1.0:/usr/lib/${multiarch}/gstreamer-1.0${GST_PLUGIN_PATH:+:$GST_PLUGIN_PATH}"' \
       >> ~/.bashrc; \
     printf '%s\n' \
-      'alias cm="cmake -S . -B build/release-arm64 -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DCATCHEYE_PICK_ENABLE_LIBCAMERA=ON -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON && cmake --build build/release-arm64 --config Release -- -j $(nproc) && mkdir -p build && ln -sf $(realpath build/release-arm64/compile_commands.json) build/compile_commands.json"' \
+      'alias cm="cmake -S . -B build/release-arm64 -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DCATCHEYE_GUARD_ENABLE_LIBCAMERA=ON -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON && cmake --build build/release-arm64 --config Release -- -j $(nproc) && mkdir -p build && ln -sf $(realpath build/release-arm64/compile_commands.json) build/compile_commands.json"' \
       'alias ci="rm -rf install/release-arm64 && cmake --install build/release-arm64 --prefix install/release-arm64"' \
       'alias cc="rm -rf build install && find log -mindepth 1 ! -name .gitkeep -delete"' \
       > ~/.bash_aliases
