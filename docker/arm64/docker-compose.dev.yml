@@ -1,0 +1,21 @@
+name: catcheye-guard-raspbian
+services:
+  catcheye-guard-develop-arm64:
+    extends:
+      file: docker-compose.base.yml
+      service: base-service
+    image: ghcr.io/itschurry/catcheye-guard:develop-arm64
+    container_name: catcheye-guard-develop-arm64
+    working_dir: /home/user/catcheye-guard
+    privileged: true
+    environment:
+      - BUILD_TYPE=develop
+    volumes:
+      - ../:/home/user/catcheye-guard:rw
+      - ${HOME}/shared:/mnt/shared:rw
+      - ${HOME}/.ssh:/home/user/.ssh:ro
+
+    command: bash
+    stdin_open: true
+    tty: true
+

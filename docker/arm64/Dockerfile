@@ -14,8 +14,8 @@ ARG HOME=/home/${USERNAME}
 
 ENV TZ=Asia/Seoul
 ENV CMAKE_PREFIX_PATH=/usr/local:/usr
-ENV PKG_CONFIG_PATH=/usr/local/lib/aarch64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
-ENV GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/gstreamer-1.0
+# ENV PKG_CONFIG_PATH=/usr/local/lib/aarch64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+# ENV GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/gstreamer-1.0
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -67,9 +67,15 @@ WORKDIR ${HOME}
 RUN set -eux; \
     printf '%s\n' \
       'export CMAKE_PREFIX_PATH=/usr/local:/usr${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}' \
-      'export PKG_CONFIG_PATH=/usr/local/lib/aarch64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}' \
-      'export GST_PLUGIN_PATH=/usr/local/lib/aarch64-linux-gnu/gstreamer-1.0:/usr/lib/aarch64-linux-gnu/gstreamer-1.0${GST_PLUGIN_PATH:+:$GST_PLUGIN_PATH}' \
-      >> ~/.bashrc
+      'multiarch="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"' \
+      'export PKG_CONFIG_PATH="/usr/local/lib/${multiarch}/pkgconfig:/usr/local/lib/pkgconfig:/usr/lib/${multiarch}/pkgconfig:/usr/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"' \
+      'export GST_PLUGIN_PATH="/usr/local/lib/${multiarch}/gstreamer-1.0:/usr/lib/${multiarch}/gstreamer-1.0${GST_PLUGIN_PATH:+:$GST_PLUGIN_PATH}"' \
+      >> ~/.bashrc; \
+    printf '%s\n' \
+      'alias cm="cmake -S . -B build/release-arm64 -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DCATCHEYE_PICK_ENABLE_LIBCAMERA=ON -DCATCHEYE_VISION_DETECTION_ENABLE_HAILO=ON && cmake --build build/release-arm64 --config Release -- -j $(nproc) && mkdir -p build && ln -sf $(realpath build/release-arm64/compile_commands.json) build/compile_commands.json"' \
+      'alias ci="rm -rf install/release-arm64 && cmake --install build/release-arm64 --prefix install/release-arm64"' \
+      'alias cc="rm -rf build install && find log -mindepth 1 ! -name .gitkeep -delete"' \
+      > ~/.bash_aliases
 
 # Raspberry Pi libcamera, built natively inside the arm64 container.
 RUN set -eux; \
