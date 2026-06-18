@@ -55,7 +55,8 @@ fi
 build_dir() {
   case "$profile" in
     debug) echo "build/debug-$arch" ;;
-    release) echo "build/release-$arch" ;;
+    # release) echo "build/release-$arch" ;;
+    release) echo "build/release" ;;
     *) echo "unknown profile: $profile" >&2; exit 2 ;;
   esac
 }
@@ -63,7 +64,8 @@ build_dir() {
 install_dir() {
   case "$profile" in
     debug) echo "install/debug-$arch" ;;
-    release) echo "install/release-$arch" ;;
+    # release) echo "install/release-$arch" ;;
+    release) echo "install/release" ;;
     *) echo "unknown profile: $profile" >&2; exit 2 ;;
   esac
 }
@@ -96,7 +98,8 @@ configure() {
 
 build() {
   in_container "cmake --build '$(build_dir)' --config '$(config_name)' -- -j \$(nproc)"
-  scripts/sync-compile-commands.sh "$profile" "$arch"
+  # scripts/sync-compile-commands.sh "$profile" "$arch"
+  scripts/sync-compile-commands.sh "$profile"
 }
 
 install_app() {
@@ -114,7 +117,8 @@ clean() {
 case "$command" in
   configure) configure ;;
   build) build ;;
-  compile-db) scripts/sync-compile-commands.sh "$profile" "$arch" ;;
+  # compile-db) scripts/sync-compile-commands.sh "$profile" "$arch" ;;
+  compile-db) scripts/sync-compile-commands.sh "$profile" ;;
   install) install_app ;;
   verify) verify ;;
   clean) clean ;;
