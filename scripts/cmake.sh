@@ -2,20 +2,21 @@
 set -euo pipefail
 
 WORKDIR="${WORKDIR:-${CATCHEYE_GUARD_CONTAINER_WORKDIR:-/home/user/catcheye-guard}}"
-host_arch="$(uname -m)"
-case "${DOCKER_ARCH:-$host_arch}" in
-  x86_64|amd64) arch="amd64" ;;
-  aarch64|arm64) arch="arm64" ;;
-  *) echo "unknown arch: ${DOCKER_ARCH:-$host_arch}" >&2; exit 2 ;;
-esac
+# host_arch="$(uname -m)"
+# case "${DOCKER_ARCH:-$host_arch}" in
+#   x86_64|amd64) arch="amd64" ;;
+#   aarch64|arm64) arch="arm64" ;;
+#   *) echo "unknown arch: ${DOCKER_ARCH:-$host_arch}" >&2; exit 2 ;;
+# esac
+arch="arm64"
 
 CONTAINER="${CONTAINER:-catcheye-guard-develop-arm64}"
-if [[ -z "$CONTAINER" ]]; then
-  case "$arch" in
-    amd64) CONTAINER="catcheye-guard-develop-amd64" ;;
-    arm64) CONTAINER="catcheye-guard-develop-arm64" ;;
-  esac
-fi
+# if [[ -z "$CONTAINER" ]]; then
+#   case "$arch" in
+#     amd64) CONTAINER="catcheye-guard-develop-amd64" ;;
+#     arm64) CONTAINER="catcheye-guard-develop-arm64" ;;
+#   esac
+# fi
 
 usage() {
   cat <<'EOF'
