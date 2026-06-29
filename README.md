@@ -33,6 +33,8 @@ Raspberry Pi ARM64 + Hailo 환경에서 카메라 프레임을 처리하고, 사
 ├── config/
 │   ├── roi_cam_default.json
 │   └── pallet_roi_cam_default.json
+├── docs/
+│   └── API.md
 ├── docker/
 │   ├── amd64/
 │   │   ├── Dockerfile
@@ -244,18 +246,14 @@ ROI 파일을 직접 지정:
 
 ## HTTP API
 
-기본 주소는 `http://<host>:8090/api/`다.
+기본 주소는 `http://<host>:8090/api/`다. 자세한 엔드포인트, 요청/응답 예시, 에러 형식은 [docs/API.md](docs/API.md)에 따로 정리했다.
 
 ```bash
 curl http://<host>:8090/api/roi
 curl http://<host>:8090/api/pallet-roi
 curl http://<host>:8090/api/device-info
-```
-
-`/api/device-info`는 사람 ROI 알림 비활성화 상태와 현재 GPIO 출력 상태를 포함한다.
-
-```json
-{"app":"catcheye-guard","kind":"guard","person_roi_alert_disabled":false,"roi_alert_output_active":false}
+curl http://<host>:8090/api/rgb-camera/properties
+curl http://<host>:8090/api/recording
 ```
 
 ROI 교체는 JSON config 파일 형식을 그대로 보낸다.
