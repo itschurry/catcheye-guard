@@ -11,4 +11,9 @@ exec "$CATHEYE_GUARD_PATH/bin/catcheye-guard" \
   --ws \
   --hef "$CATHEYE_GUARD_PATH/models/yolo26m.hef" \
   --metadata "$CATHEYE_GUARD_PATH/models/metadata.yaml" \
+  --roi-alert-active-low 14 \
+  --person-roi-alert-disable-gpio 15 \
+  --person-roi-alert-disable-active-low false \
+  --person-roi-alert-disable-debounce-ms 200 \
   --recording-dir "$RECORDING_DIR"
+
