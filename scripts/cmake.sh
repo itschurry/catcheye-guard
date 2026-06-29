@@ -28,7 +28,7 @@ Commands:
   install     Install
   verify      Run installed app --help
   compile-db  Sync compile_commands.json for host tools
-  clean       Remove build/install and clean log
+  clean       Remove build/install
   all         Configure, build, install, verify
 
 Profiles:
@@ -111,7 +111,7 @@ verify() {
 }
 
 clean() {
-  in_container "rm -rf build install && find log -mindepth 1 ! -name .gitkeep -delete"
+  in_container "rm -rf build install"
 }
 
 case "$command" in
