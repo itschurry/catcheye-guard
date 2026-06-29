@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -25,6 +26,28 @@ class GpioStateSignal {
     void set_active(bool active);
 
     GpioSignalConfig config_;
+    std::unique_ptr<Backend> backend_;
+    bool initialized_ = false;
+};
+
+class GpioInputSignal {
+  public:
+    using StateCallback = std::function<void(bool active)>;
+
+    GpioInputSignal(GpioInputConfig config, StateCallback callback);
+    ~GpioInputSignal();
+
+    GpioInputSignal(const GpioInputSignal&) = delete;
+    GpioInputSignal& operator=(const GpioInputSignal&) = delete;
+
+    bool initialize();
+    void shutdown();
+
+  private:
+    class Backend;
+
+    GpioInputConfig config_;
+    StateCallback callback_;
     std::unique_ptr<Backend> backend_;
     bool initialized_ = false;
 };

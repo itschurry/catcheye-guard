@@ -2,7 +2,9 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -64,12 +66,16 @@ std::string build_metadata_json(const std::vector<EvaluatedDetection>& detection
                                 const std::vector<PalletEvaluation>& pallets,
                                 const IDetector& detector,
                                 bool roi_enabled,
+                                bool person_roi_alert_disabled,
+                                bool roi_alert_output_active,
                                 bool pallet_detection_enabled,
                                 bool pallet_present,
                                 double inference_ms) {
     std::ostringstream oss;
     oss << "{\"roi_enabled\":" << (roi_enabled ? "true" : "false") << ",\"detection_count\":" << detections.size()
         << ",\"inference_ms\":" << inference_ms
+        << ",\"person_roi_alert_disabled\":" << (person_roi_alert_disabled ? "true" : "false")
+        << ",\"roi_alert_output_active\":" << (roi_alert_output_active ? "true" : "false")
         << ",\"pallet_detection_enabled\":" << (pallet_detection_enabled ? "true" : "false")
         << ",\"pallet_present\":" << (pallet_present ? "true" : "false")
         << ",\"pallet_count\":" << pallets.size()
@@ -105,7 +111,7 @@ std::string build_metadata_json(const std::vector<EvaluatedDetection>& detection
 }
 
 std::string build_viewer_metadata_json() {
-    return "{\"viewer_only\":true,\"detection_count\":0,\"detections\":[]}";
+    return "{\"viewer_only\":true,\"detection_count\":0,\"person_roi_alert_disabled\":false,\"roi_alert_output_active\":false,\"detections\":[]}";
 }
 
 cv::Mat frame_to_bgr_mat(const catcheye::input::Frame& frame) {
@@ -211,7 +217,12 @@ bool build_viewer_publish_frame(const catcheye::input::Frame& source_frame,
 GuardProcessor::GuardProcessor(GuardProcessorConfig config)
     : config_(std::move(config)),
       detector_(config_.detection_enabled ? create_detector(config_.detector) : nullptr),
-      roi_alert_signal_(std::make_unique<catcheye::hardware::GpioStateSignal>(config_.roi_alert_gpio))
+      roi_alert_signal_(std::make_unique<catcheye::hardware::GpioStateSignal>(config_.roi_alert_gpio)),
+      person_roi_alert_disable_signal_(std::make_unique<catcheye::hardware::GpioInputSignal>(
+          config_.person_roi_alert_disable_gpio,
+          [this](bool active) {
+              set_person_roi_alert_disabled(active);
+          }))
 {
     if (const auto log = logger()) {
         log->info("GuardProcessor created");
@@ -283,7 +294,79 @@ bool GuardProcessor::initialize() {
         return false;
     }
 
+    if (config_.detection_enabled && !person_roi_alert_disable_signal_->initialize()) {
+        if (const auto log = logger()) {
+            log->error("failed to initialize person ROI alert disable GPIO input");
+        }
+        return false;
+    }
+
     return true;
+}
+
+RoiAlertRuntimeStatus GuardProcessor::roi_alert_status() const {
+    std::lock_guard<std::mutex> lock(alert_mutex_);
+    return {
+        .person_roi_alert_disabled = person_roi_alert_disabled_,
+        .roi_alert_output_active = roi_alert_output_active_,
+    };
+}
+
+std::string GuardProcessor::roi_alert_status_json() const {
+    const RoiAlertRuntimeStatus status = roi_alert_status();
+    std::ostringstream oss;
+    oss << "{\"person_roi_alert_disabled\":" << (status.person_roi_alert_disabled ? "true" : "false")
+        << ",\"roi_alert_output_active\":" << (status.roi_alert_output_active ? "true" : "false") << "}";
+    return oss.str();
+}
+
+void GuardProcessor::set_person_roi_alert_disabled(bool disabled) {
+    {
+        std::lock_guard<std::mutex> lock(alert_mutex_);
+        if (person_roi_alert_disabled_ == disabled) {
+            return;
+        }
+        person_roi_alert_disabled_ = disabled;
+        apply_roi_alert_output_locked(std::nullopt);
+    }
+
+    if (const auto log = logger()) {
+        log->info("person ROI alert {}", disabled ? "disabled" : "enabled");
+    }
+}
+
+void GuardProcessor::apply_roi_alert_output_locked(std::optional<std::uint64_t> frame_index) {
+    const bool alert_requested = (!person_roi_alert_disabled_ && person_roi_violation_active_) || pallet_alert_active_;
+    const bool next_output_active = config_.roi_alert_gpio.enabled && alert_requested;
+    if (roi_alert_output_active_ == next_output_active) {
+        return;
+    }
+
+    roi_alert_signal_->set_state(next_output_active);
+    roi_alert_output_active_ = next_output_active;
+
+    if (const auto log = logger()) {
+        if (next_output_active) {
+            if (frame_index.has_value()) {
+                log->info("ROI alert GPIO ON at frame={} (person_roi_violation={}, person_roi_alert_disabled={}, pallet_alert_active={})",
+                          *frame_index,
+                          person_roi_violation_active_,
+                          person_roi_alert_disabled_,
+                          pallet_alert_active_);
+            } else {
+                log->info("ROI alert GPIO ON (person_roi_violation={}, person_roi_alert_disabled={}, pallet_alert_active={})",
+                          person_roi_violation_active_,
+                          person_roi_alert_disabled_,
+                          pallet_alert_active_);
+            }
+        } else {
+            if (frame_index.has_value()) {
+                log->info("ROI alert GPIO OFF at frame={}", *frame_index);
+            } else {
+                log->info("ROI alert GPIO OFF");
+            }
+        }
+    }
 }
 
 bool GuardProcessor::update_roi_config(const catcheye::roi::CameraRoiConfig& roi_config) {
@@ -409,21 +492,18 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
         }
     }
 
-    const bool alert_active = has_roi_violation || (config_.pallet_detection_enabled && !pallet_present);
-    if (roi_violation_active_ != alert_active) {
-        roi_alert_signal_->set_state(alert_active);
-        if (const auto log = logger()) {
-            if (alert_active) {
-                log->info("ROI alert GPIO ON at frame={} (person_roi_violation={}, pallet_present={})",
-                          context.frame_index,
-                          has_roi_violation,
-                          pallet_present);
-            } else {
-                log->info("ROI alert GPIO OFF at frame={}", context.frame_index);
-            }
-        }
+    const bool pallet_alert_active = config_.pallet_detection_enabled && !pallet_present;
+    RoiAlertRuntimeStatus alert_status;
+    {
+        std::lock_guard<std::mutex> lock(alert_mutex_);
+        person_roi_violation_active_ = has_roi_violation;
+        pallet_alert_active_ = pallet_alert_active;
+        apply_roi_alert_output_locked(context.frame_index);
+        alert_status = {
+            .person_roi_alert_disabled = person_roi_alert_disabled_,
+            .roi_alert_output_active = roi_alert_output_active_,
+        };
     }
-    roi_violation_active_ = alert_active;
 
     catcheye::runtime::ProcessOutput output;
     if (!context.needs_publish) {
@@ -437,6 +517,8 @@ catcheye::runtime::ProcessOutput GuardProcessor::process(const catcheye::input::
         evaluated_pallets,
         *detector_,
         roi.enabled,
+        alert_status.person_roi_alert_disabled,
+        alert_status.roi_alert_output_active,
         config_.pallet_detection_enabled,
         pallet_present,
         cached_inference_ms_);

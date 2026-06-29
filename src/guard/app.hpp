@@ -26,6 +26,9 @@ struct AppOptions {
     int http_port = 8090;
     int roi_alert_gpio = 14;
     bool roi_alert_active_low = false;
+    int person_roi_alert_disable_gpio = -1;
+    bool person_roi_alert_disable_active_low = false;
+    int person_roi_alert_disable_debounce_ms = 200;
     bool viewer_only = false;
     int pallet_class_id = 1;
     std::string gpio_chip_path = "/dev/gpiochip4";

@@ -14,6 +14,7 @@ Raspberry Pi ARM64 + Hailo 환경에서 카메라 프레임을 처리하고, 사
 - 위험 ROI 진입 판정
 - 파렛트 필수 영역 존재 판정
 - GPIO 상태 유지 출력
+- GPIO 입력 기반 사람 ROI 알림 비활성화
 - WebSocket 프레임 송출
 - HTTP API 기반 ROI 조회/교체, 카메라 제어, 녹화 제어
 
@@ -194,6 +195,19 @@ ROI 파일을 직접 지정:
   ./config/roi_cam_default.json
 ```
 
+사람 ROI 알림 비활성화 입력 GPIO를 같이 지정:
+
+```bash
+./install/release-arm64/bin/catcheye-guard \
+  --camera \
+  --ws \
+  --hef ./models/yolo26m.hef \
+  --metadata ./models/metadata.yaml \
+  --roi-alert-gpio 14 \
+  --person-roi-alert-disable-gpio 15 \
+  --gpio-chip /dev/gpiochip4
+```
+
 ## 주요 옵션
 
 | 옵션 | 설명 |
@@ -215,7 +229,18 @@ ROI 파일을 직접 지정:
 | `--roi-alert-gpio <line>` | ROI 알림 GPIO line을 지정한다. `-1`이면 비활성화한다. |
 | `--gpio-chip <path>` | GPIO chip 경로를 지정한다. 기본값은 `/dev/gpiochip4`다. |
 | `--roi-alert-active-low` | GPIO 출력을 active-low로 쓴다. |
+| `--person-roi-alert-disable-gpio <line>` | 입력이 active인 동안 사람 ROI 알림만 비활성화한다. 기본값은 `-1`이다. |
+| `--person-roi-alert-disable-active-low` | 사람 ROI 알림 비활성화 입력을 active-low로 해석한다. |
+| `--person-roi-alert-disable-debounce-ms <ms>` | 사람 ROI 알림 비활성화 입력 디바운스 시간을 지정한다. 기본값은 `200`이다. |
 | `--recording-dir <path>` | preview 녹화 디렉터리를 지정한다. |
+
+## GPIO 연결
+
+- `--roi-alert-gpio`는 사람 ROI 위반 또는 파렛트 미검출 시 알림을 출력한다.
+- `--person-roi-alert-disable-gpio` 입력이 active인 동안에는 사람 ROI 위반 알림만 출력에서 제외한다.
+- 파렛트 미검출 알림은 사람 ROI 비활성화 입력의 영향을 받지 않는다.
+- PLC 24V를 Raspberry Pi GPIO에 직접 넣으면 안 된다. PLC 출력은 릴레이나 절연 접점으로 넘기고, Raspberry Pi GPIO는 3.3V 입력으로 구성한다.
+- PLC가 pulse를 내면 pulse 동안만 사람 ROI 알림이 비활성화된다. 작업 중 계속 끄려면 PLC 출력도 유지 출력이어야 한다.
 
 ## HTTP API
 
@@ -224,7 +249,13 @@ ROI 파일을 직접 지정:
 ```bash
 curl http://<host>:8090/api/roi
 curl http://<host>:8090/api/pallet-roi
-curl http://<host>:8090/api/info
+curl http://<host>:8090/api/device-info
+```
+
+`/api/device-info`는 사람 ROI 알림 비활성화 상태와 현재 GPIO 출력 상태를 포함한다.
+
+```json
+{"app":"catcheye-guard","kind":"guard","person_roi_alert_disabled":false,"roi_alert_output_active":false}
 ```
 
 ROI 교체는 JSON config 파일 형식을 그대로 보낸다.

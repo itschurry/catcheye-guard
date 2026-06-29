@@ -253,9 +253,14 @@ bool HttpApiServer::start()
         .port = config_.port,
     });
 
-    server_->add_route("/api/device-info", [](const catcheye::http::HttpRequest& request) {
+    server_->add_route("/api/device-info", [this](const catcheye::http::HttpRequest& request) {
         if (request.method == "GET") {
-            return catcheye::http::HttpResponse{200, "OK", R"({"app":"catcheye-guard","kind":"guard"})"};
+            const RoiAlertRuntimeStatus status = processor_->roi_alert_status();
+            std::ostringstream oss;
+            oss << "{\"app\":\"catcheye-guard\",\"kind\":\"guard\""
+                << ",\"person_roi_alert_disabled\":" << (status.person_roi_alert_disabled ? "true" : "false")
+                << ",\"roi_alert_output_active\":" << (status.roi_alert_output_active ? "true" : "false") << "}";
+            return catcheye::http::HttpResponse{200, "OK", oss.str()};
         }
         return catcheye::http::HttpResponse{405, "Method Not Allowed", catcheye::http::json_error_body("method not allowed")};
     });

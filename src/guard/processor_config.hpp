@@ -32,6 +32,7 @@ struct GuardProcessorConfig {
 
     // ── GPIO signal ──────────────────────────────────────────
     GpioSignalConfig roi_alert_gpio;
+    GpioInputConfig person_roi_alert_disable_gpio;
 };
 
 } // namespace catcheye

@@ -1,5 +1,6 @@
 #include "guard/app.hpp"
 
+#include <chrono>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -50,6 +51,9 @@ void print_usage() {
               << "  --roi-alert-gpio <line>     ROI alert GPIO line; -1 disables output (default: 14)\n"
               << "  --gpio-chip <path>          GPIO chip path (default: /dev/gpiochip4)\n"
               << "  --roi-alert-active-low      Drive ROI alert GPIO active-low\n"
+              << "  --person-roi-alert-disable-gpio <line>  Disable person ROI alert while GPIO input is active\n"
+              << "  --person-roi-alert-disable-active-low   Treat person ROI alert disable input as active-low\n"
+              << "  --person-roi-alert-disable-debounce-ms <ms>  GPIO input debounce duration (default: 200)\n"
               << "  --recording-dir <path>      Preview recording directory (default: recordings)\n"
               << "\n"
               << "Examples:\n"
@@ -206,6 +210,12 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.gpio_chip_path = read_required_value(args, i, arg);
         } else if (arg == "--roi-alert-active-low") {
             options.roi_alert_active_low = true;
+        } else if (arg == "--person-roi-alert-disable-gpio") {
+            options.person_roi_alert_disable_gpio = std::stoi(std::string(read_required_value(args, i, arg)));
+        } else if (arg == "--person-roi-alert-disable-active-low") {
+            options.person_roi_alert_disable_active_low = true;
+        } else if (arg == "--person-roi-alert-disable-debounce-ms") {
+            options.person_roi_alert_disable_debounce_ms = std::stoi(std::string(read_required_value(args, i, arg)));
         } else if (arg == "--viewer-only") {
             options.viewer_only = true;
         } else if (arg == "--hef") {
@@ -260,6 +270,17 @@ AppOptions parse_app_options(int argc, char** argv) {
     }
     if (options.roi_alert_gpio < -1) {
         throw std::runtime_error("ROI alert GPIO line must be -1 or a non-negative integer");
+    }
+    if (options.person_roi_alert_disable_gpio < -1) {
+        throw std::runtime_error("person ROI alert disable GPIO line must be -1 or a non-negative integer");
+    }
+    if (options.person_roi_alert_disable_debounce_ms < 0) {
+        throw std::runtime_error("person ROI alert disable debounce must be zero or a positive integer");
+    }
+    if (options.roi_alert_gpio >= 0 &&
+        options.person_roi_alert_disable_gpio >= 0 &&
+        options.roi_alert_gpio == options.person_roi_alert_disable_gpio) {
+        throw std::runtime_error("ROI alert output GPIO and person ROI alert disable GPIO must use different lines");
     }
     if (options.pallet_class_id < 0) {
         throw std::runtime_error("pallet class id must be a non-negative integer");
@@ -360,6 +381,13 @@ AppBootstrap build_app_bootstrap(
     bootstrap.processor_config.roi_alert_gpio.line = options.roi_alert_gpio;
     bootstrap.processor_config.roi_alert_gpio.active_low = options.roi_alert_active_low;
     bootstrap.processor_config.roi_alert_gpio.consumer = "catcheye-guard-roi-alert";
+    bootstrap.processor_config.person_roi_alert_disable_gpio.enabled = options.person_roi_alert_disable_gpio >= 0;
+    bootstrap.processor_config.person_roi_alert_disable_gpio.chip_path = options.gpio_chip_path;
+    bootstrap.processor_config.person_roi_alert_disable_gpio.line = options.person_roi_alert_disable_gpio;
+    bootstrap.processor_config.person_roi_alert_disable_gpio.active_low = options.person_roi_alert_disable_active_low;
+    bootstrap.processor_config.person_roi_alert_disable_gpio.debounce_duration =
+        std::chrono::milliseconds(options.person_roi_alert_disable_debounce_ms);
+    bootstrap.processor_config.person_roi_alert_disable_gpio.consumer = "catcheye-guard-person-roi-alert-disable";
 
     bootstrap.runtime_config.process_every_n_frames = 2;
     bootstrap.publisher_type = options.publisher_type;
@@ -416,6 +444,13 @@ int run_app(int argc, char** argv) {
                       bootstrap.processor_config.roi_alert_gpio.chip_path,
                       bootstrap.processor_config.roi_alert_gpio.line,
                       bootstrap.processor_config.roi_alert_gpio.active_low);
+        }
+        if (bootstrap.processor_config.person_roi_alert_disable_gpio.enabled) {
+            log->info("person ROI alert disable GPIO enabled: chip='{}', line={}, active_low={}, debounce_ms={}",
+                      bootstrap.processor_config.person_roi_alert_disable_gpio.chip_path,
+                      bootstrap.processor_config.person_roi_alert_disable_gpio.line,
+                      bootstrap.processor_config.person_roi_alert_disable_gpio.active_low,
+                      bootstrap.processor_config.person_roi_alert_disable_gpio.debounce_duration.count());
         }
     }
 
