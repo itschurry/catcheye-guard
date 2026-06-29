@@ -13,7 +13,7 @@ Raspberry Pi ARM64 + Hailo 환경에서 카메라 프레임을 처리하고, 사
 - HailoRT 기반 YOLO 검출
 - 위험 ROI 진입 판정
 - 파렛트 필수 영역 존재 판정
-- GPIO pulse 출력
+- GPIO 상태 유지 출력
 - WebSocket 프레임 송출
 - HTTP API 기반 ROI 조회/교체, 카메라 제어, 녹화 제어
 
@@ -213,7 +213,6 @@ ROI 파일을 직접 지정:
 | `--pallet-roi <path>` | 파렛트 ROI config 경로를 지정한다. |
 | `--pallet-class-id <id>` | 파렛트 클래스 id를 지정한다. 기본값은 `1`이다. |
 | `--roi-alert-gpio <line>` | ROI 알림 GPIO line을 지정한다. `-1`이면 비활성화한다. |
-| `--roi-alert-pulse-ms <ms>` | GPIO pulse 시간을 지정한다. 기본값은 `100`이다. |
 | `--gpio-chip <path>` | GPIO chip 경로를 지정한다. 기본값은 `/dev/gpiochip4`다. |
 | `--roi-alert-active-low` | GPIO 출력을 active-low로 쓴다. |
 | `--recording-dir <path>` | preview 녹화 디렉터리를 지정한다. |

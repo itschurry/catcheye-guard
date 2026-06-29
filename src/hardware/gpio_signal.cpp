@@ -1,6 +1,5 @@
 #include "catcheye/hardware/gpio_signal.hpp"
 
-#include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <string>
@@ -11,18 +10,7 @@
 #include <gpiod.h>
 
 namespace catcheye::hardware {
-namespace {
-
-std::chrono::milliseconds normalized_pulse_duration(std::chrono::milliseconds duration) {
-    if (duration.count() < 0) {
-        return std::chrono::milliseconds{0};
-    }
-    return duration;
-}
-
-} // namespace
-
-class GpioPulseSignal::Backend {
+class GpioStateSignal::Backend {
   public:
     explicit Backend(GpioSignalConfig config)
         : config_(std::move(config)) {}
@@ -145,14 +133,14 @@ class GpioPulseSignal::Backend {
     GpioSignalConfig config_;
 };
 
-GpioPulseSignal::GpioPulseSignal(GpioSignalConfig config)
+GpioStateSignal::GpioStateSignal(GpioSignalConfig config)
     : config_(std::move(config)) {}
 
-GpioPulseSignal::~GpioPulseSignal() {
+GpioStateSignal::~GpioStateSignal() {
     shutdown();
 }
 
-bool GpioPulseSignal::initialize() {
+bool GpioStateSignal::initialize() {
     if (!config_.enabled || config_.line < 0) {
         return true;
     }
@@ -163,123 +151,32 @@ bool GpioPulseSignal::initialize() {
         return false;
     }
 
-    worker_ = std::thread(&GpioPulseSignal::worker_loop, this);
     initialized_ = true;
 
     if (const auto log = logger()) {
-        log->info("GPIO pulse signal ready: chip='{}', line={}, active_low={}, pulse_ms={}",
+        log->info("GPIO state signal ready: chip='{}', line={}, active_low={}",
                   config_.chip_path,
                   config_.line,
-                  config_.active_low,
-                  normalized_pulse_duration(config_.pulse_duration).count());
+                  config_.active_low);
     }
     return true;
 }
 
-void GpioPulseSignal::set_state(bool active) {
+void GpioStateSignal::set_state(bool active) {
     if (!initialized_ || backend_ == nullptr) {
         return;
     }
 
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        hold_state_ = active;
-        hold_requested_ = true;
-        pulse_requested_ = false;
-        pulse_until_.reset();
-    }
-    cv_.notify_one();
+    set_active(active);
 }
 
-void GpioPulseSignal::trigger() {
-    if (!initialized_ || backend_ == nullptr) {
-        return;
-    }
-
-    const auto duration = normalized_pulse_duration(config_.pulse_duration);
-    if (duration.count() == 0) {
-        set_active(true);
-        set_active(false);
-        return;
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        pulse_requested_ = true;
-        const auto requested_until = std::chrono::steady_clock::now() + duration;
-        pulse_until_ = std::max(pulse_until_.value_or(requested_until), requested_until);
-    }
-    cv_.notify_one();
-}
-
-void GpioPulseSignal::shutdown() {
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (!initialized_ && worker_.joinable() == false) {
-            backend_.reset();
-            return;
-        }
-        stop_requested_ = true;
-    }
-    cv_.notify_one();
-
-    if (worker_.joinable()) {
-        worker_.join();
-    }
-
+void GpioStateSignal::shutdown() {
+    set_active(false);
     initialized_ = false;
     backend_.reset();
 }
 
-void GpioPulseSignal::worker_loop() {
-    std::unique_lock<std::mutex> lock(mutex_);
-
-    while (!stop_requested_) {
-        if (!pulse_requested_ && !pulse_until_.has_value() && !hold_requested_) {
-            cv_.wait(lock, [this]() {
-                return stop_requested_ || (pulse_requested_ && pulse_until_.has_value()) || hold_requested_;
-            });
-            if (stop_requested_) {
-                break;
-            }
-        }
-
-        if (hold_requested_) {
-            const bool requested_state = hold_state_;
-            hold_requested_ = false;
-            lock.unlock();
-            set_active(requested_state);
-            lock.lock();
-            continue;
-        }
-
-        const auto pulse_deadline = *pulse_until_;
-        pulse_requested_ = false;
-        lock.unlock();
-        set_active(true);
-        lock.lock();
-
-        cv_.wait_until(lock, pulse_deadline, [this, pulse_deadline]() {
-            return stop_requested_ || (pulse_until_.has_value() && *pulse_until_ > pulse_deadline);
-        });
-        if (stop_requested_) {
-            break;
-        }
-        if (pulse_until_.has_value() && *pulse_until_ > pulse_deadline) {
-            continue;
-        }
-
-        pulse_until_.reset();
-        lock.unlock();
-        set_active(false);
-        lock.lock();
-    }
-
-    lock.unlock();
-    set_active(false);
-}
-
-void GpioPulseSignal::set_active(bool active) {
+void GpioStateSignal::set_active(bool active) {
     if (backend_ != nullptr) {
         backend_->set_active(active);
     }

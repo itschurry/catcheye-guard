@@ -1,6 +1,5 @@
 #include "guard/app.hpp"
 
-#include <chrono>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -49,7 +48,6 @@ void print_usage() {
               << "  --pallet-roi <path>         Pallet ROI config path\n"
               << "  --pallet-class-id <id>      Pallet class id (default: 1)\n"
               << "  --roi-alert-gpio <line>     ROI alert GPIO line; -1 disables output (default: 14)\n"
-              << "  --roi-alert-pulse-ms <ms>   ROI alert pulse duration (default: 100)\n"
               << "  --gpio-chip <path>          GPIO chip path (default: /dev/gpiochip4)\n"
               << "  --roi-alert-active-low      Drive ROI alert GPIO active-low\n"
               << "  --recording-dir <path>      Preview recording directory (default: recordings)\n"
@@ -204,8 +202,6 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.http_port = std::stoi(std::string(read_required_value(args, i, arg)));
         } else if (arg == "--roi-alert-gpio") {
             options.roi_alert_gpio = std::stoi(std::string(read_required_value(args, i, arg)));
-        } else if (arg == "--roi-alert-pulse-ms") {
-            options.roi_alert_pulse_ms = std::stoi(std::string(read_required_value(args, i, arg)));
         } else if (arg == "--gpio-chip") {
             options.gpio_chip_path = read_required_value(args, i, arg);
         } else if (arg == "--roi-alert-active-low") {
@@ -264,9 +260,6 @@ AppOptions parse_app_options(int argc, char** argv) {
     }
     if (options.roi_alert_gpio < -1) {
         throw std::runtime_error("ROI alert GPIO line must be -1 or a non-negative integer");
-    }
-    if (options.roi_alert_pulse_ms < 0) {
-        throw std::runtime_error("ROI alert pulse must be zero or a positive integer");
     }
     if (options.pallet_class_id < 0) {
         throw std::runtime_error("pallet class id must be a non-negative integer");
@@ -366,7 +359,6 @@ AppBootstrap build_app_bootstrap(
     bootstrap.processor_config.roi_alert_gpio.chip_path = options.gpio_chip_path;
     bootstrap.processor_config.roi_alert_gpio.line = options.roi_alert_gpio;
     bootstrap.processor_config.roi_alert_gpio.active_low = options.roi_alert_active_low;
-    bootstrap.processor_config.roi_alert_gpio.pulse_duration = std::chrono::milliseconds(options.roi_alert_pulse_ms);
     bootstrap.processor_config.roi_alert_gpio.consumer = "catcheye-guard-roi-alert";
 
     bootstrap.runtime_config.process_every_n_frames = 2;
@@ -420,10 +412,9 @@ int run_app(int argc, char** argv) {
             log->info("detector disabled: viewer-only mode");
         }
         if (bootstrap.processor_config.roi_alert_gpio.enabled) {
-            log->info("ROI alert GPIO enabled: chip='{}', line={}, pulse_ms={}, active_low={}",
+            log->info("ROI alert GPIO enabled: chip='{}', line={}, active_low={}",
                       bootstrap.processor_config.roi_alert_gpio.chip_path,
                       bootstrap.processor_config.roi_alert_gpio.line,
-                      bootstrap.processor_config.roi_alert_gpio.pulse_duration.count(),
                       bootstrap.processor_config.roi_alert_gpio.active_low);
         }
     }

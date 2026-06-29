@@ -211,7 +211,7 @@ bool build_viewer_publish_frame(const catcheye::input::Frame& source_frame,
 GuardProcessor::GuardProcessor(GuardProcessorConfig config)
     : config_(std::move(config)),
       detector_(config_.detection_enabled ? create_detector(config_.detector) : nullptr),
-      roi_alert_signal_(std::make_unique<catcheye::hardware::GpioPulseSignal>(config_.roi_alert_gpio))
+      roi_alert_signal_(std::make_unique<catcheye::hardware::GpioStateSignal>(config_.roi_alert_gpio))
 {
     if (const auto log = logger()) {
         log->info("GuardProcessor created");
