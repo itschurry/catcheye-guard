@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CATHEYE_GUARD_PATH="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 RECORDING_DIR="${CATCHEYE_GUARD_RECORDING_DIR:-/home/user/catcheye-guard/recordings}"
+CAMERA_PROPERTIES="${CATCHEYE_GUARD_CAMERA_PROPERTIES:-$CATCHEYE_GUARD_PATH/config/camera_properties.json}"
 
 exec "$CATHEYE_GUARD_PATH/bin/catcheye-guard" \
   --camera \
@@ -14,4 +15,5 @@ exec "$CATHEYE_GUARD_PATH/bin/catcheye-guard" \
   --roi-alert-gpio 14 \
   --person-roi-alert-disable-gpio 15 \
   --person-roi-alert-disable-debounce-ms 200 \
-  --recording-dir "$RECORDING_DIR"
+  --recording-dir "$RECORDING_DIR" \
+  --camera-properties "$CAMERA_PROPERTIES"

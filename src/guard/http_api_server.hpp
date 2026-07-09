@@ -24,7 +24,8 @@ class HttpApiServer {
         std::string pallet_roi_config_path,
         GuardProcessor* processor,
         catcheye::input::FrameSource* camera_source,
-        RecordingController* recording_controller);
+        RecordingController* recording_controller,
+        std::string camera_properties_path);
     ~HttpApiServer();
 
     bool start();
@@ -34,6 +35,7 @@ class HttpApiServer {
     HttpApiServerConfig config_;
     std::string roi_config_path_;
     std::string pallet_roi_config_path_;
+    std::string camera_properties_path_;
     GuardProcessor* processor_ = nullptr;
     catcheye::input::FrameSource* camera_source_ = nullptr;
     RecordingController* recording_controller_ = nullptr;

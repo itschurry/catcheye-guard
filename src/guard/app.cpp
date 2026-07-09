@@ -4,6 +4,7 @@
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -15,6 +16,7 @@
 #include "catcheye/roi/roi_validation.hpp"
 #include "catcheye/runtime/frame_processing_runner.hpp"
 #include "catcheye/utils/logger.hpp"
+#include "guard/camera_properties.hpp"
 #include "guard/http_api_server.hpp"
 #include "guard/processor.hpp"
 #include "guard/recording_controller.hpp"
@@ -55,6 +57,7 @@ void print_usage() {
               << "  --person-roi-alert-disable-active-low   Treat person ROI alert disable input as active-low\n"
               << "  --person-roi-alert-disable-debounce-ms <ms>  GPIO input debounce duration (default: 200)\n"
               << "  --recording-dir <path>      Preview recording directory (default: recordings)\n"
+              << "  --camera-properties <path>  RGB camera properties JSON path (default: config/camera_properties.json)\n"
               << "\n"
               << "Examples:\n"
               << "  catcheye-guard --help\n"
@@ -150,6 +153,49 @@ std::string describe_runtime_mode(const AppOptions& options)
     return std::string(input_name) + " + gstreamer source + " + processing_name + " + " + output_name;
 }
 
+class CameraPropertiesFrameSource final : public catcheye::input::FrameSource {
+  public:
+    CameraPropertiesFrameSource(
+        std::unique_ptr<catcheye::input::FrameSource> inner,
+        CameraPropertyMap properties,
+        std::string properties_path)
+        : inner_(std::move(inner)),
+          properties_(std::move(properties)),
+          properties_path_(std::move(properties_path)) {}
+
+    bool open() override
+    {
+        if (!inner_->open()) {
+            return false;
+        }
+        std::string error;
+        if (!apply_camera_properties(*inner_, properties_, error)) {
+            std::cerr << error << " from '" << properties_path_ << "'\n";
+            inner_->close();
+            return false;
+        }
+        return true;
+    }
+
+    bool is_open() const override { return inner_->is_open(); }
+    catcheye::input::FrameReadStatus read(catcheye::input::Frame& frame) override { return inner_->read(frame); }
+    void close() override { inner_->close(); }
+    std::string describe() const override { return inner_->describe() + " + camera-properties:" + properties_path_; }
+    std::optional<std::string> property_json(std::string_view key) const override { return inner_->property_json(key); }
+    bool set_bool_property(std::string_view key, bool value) override { return inner_->set_bool_property(key, value); }
+    bool set_int_property(std::string_view key, int value) override { return inner_->set_int_property(key, value); }
+    bool set_float_property(std::string_view key, float value) override { return inner_->set_float_property(key, value); }
+    bool set_string_property(std::string_view key, std::string_view value) override
+    {
+        return inner_->set_string_property(key, value);
+    }
+
+  private:
+    std::unique_ptr<catcheye::input::FrameSource> inner_;
+    CameraPropertyMap properties_;
+    std::string properties_path_;
+};
+
 } // namespace
 
 AppOptions parse_app_options(int argc, char** argv) {
@@ -226,6 +272,8 @@ AppOptions parse_app_options(int argc, char** argv) {
             options.pallet_roi_config_path = read_required_value(args, i, arg);
         } else if (arg == "--recording-dir") {
             options.recording_dir = read_required_value(args, i, arg);
+        } else if (arg == "--camera-properties") {
+            options.camera_properties_path = read_required_value(args, i, arg);
         } else if (arg == "--pallet-class-id") {
             options.pallet_class_id = std::stoi(std::string(read_required_value(args, i, arg)));
         } else if (is_input_mode(arg)) {
@@ -288,6 +336,9 @@ AppOptions parse_app_options(int argc, char** argv) {
     if (options.recording_dir.empty()) {
         throw std::runtime_error("recording directory must not be empty");
     }
+    if (options.camera_properties_path.empty()) {
+        throw std::runtime_error("camera properties path must not be empty");
+    }
 
     if ((options.input.camera_width % 2) != 0 || (options.input.camera_height % 2) != 0) {
         throw std::runtime_error("camera dimensions must be even for NV12 output");
@@ -331,6 +382,7 @@ DefaultPaths resolve_default_paths(const char* executable_path) {
         .hef_path = resolve_default_model_path(executable_path, "yolo26m.hef"),
         .roi_config_path = resolve_default_config_path(executable_path, "roi_cam_default.json"),
         .pallet_roi_config_path = resolve_default_config_path(executable_path, "pallet_roi_cam_default.json"),
+        .camera_properties_path = resolve_default_config_path(executable_path, "camera_properties.json"),
     };
 }
 
@@ -399,6 +451,15 @@ AppBootstrap build_app_bootstrap(
     }
 
     bootstrap.source = catcheye::input::create_frame_source(options.input);
+    const std::string camera_properties_path =
+        options.camera_properties_path == "config/camera_properties.json" ? default_paths.camera_properties_path : options.camera_properties_path;
+    if (options.input.type == catcheye::input::InputSourceType::Camera) {
+        CameraPropertyMap camera_properties = load_camera_properties_file(camera_properties_path);
+        bootstrap.source = std::make_unique<CameraPropertiesFrameSource>(
+            std::move(bootstrap.source),
+            std::move(camera_properties),
+            camera_properties_path);
+    }
     return bootstrap;
 }
 
@@ -416,6 +477,8 @@ int run_app(int argc, char** argv) {
     const std::string roi_config_path = !options.positional_args.empty() ? options.positional_args[0] : default_paths.roi_config_path;
     const std::string pallet_roi_config_path =
         options.pallet_roi_config_path.empty() ? default_paths.pallet_roi_config_path : options.pallet_roi_config_path;
+    const std::string camera_properties_path =
+        options.camera_properties_path == "config/camera_properties.json" ? default_paths.camera_properties_path : options.camera_properties_path;
     const LoadedRoiConfig loaded_roi_config = options.viewer_only ? LoadedRoiConfig{} : load_and_validate_roi_config(roi_config_path);
     const LoadedRoiConfig loaded_pallet_roi_config =
         options.viewer_only ? LoadedRoiConfig{} : load_and_validate_roi_config(pallet_roi_config_path);
@@ -452,6 +515,7 @@ int run_app(int argc, char** argv) {
                       bootstrap.processor_config.person_roi_alert_disable_gpio.active_low,
                       bootstrap.processor_config.person_roi_alert_disable_gpio.debounce_duration.count());
         }
+        log->info("RGB camera properties config: '{}'", camera_properties_path);
     }
 
     std::unique_ptr<catcheye::transport::ResultPublisher> publisher;
@@ -472,7 +536,8 @@ int run_app(int argc, char** argv) {
         http_pallet_roi_config_path,
         processor_ptr,
         camera_source_ptr,
-        recording_controller.get());
+        recording_controller.get(),
+        camera_properties_path);
     if (!http_api_server->start()) {
         throw std::runtime_error("failed to start HTTP API server");
     }

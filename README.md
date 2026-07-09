@@ -31,6 +31,7 @@ Raspberry Pi ARM64 + Hailo 환경에서 카메라 프레임을 처리하고, 사
 .
 ├── CMakeLists.txt
 ├── config/
+│   ├── camera_properties.json
 │   ├── roi_cam_default.json
 │   └── pallet_roi_cam_default.json
 ├── docs/
@@ -233,6 +234,7 @@ ROI 파일을 직접 지정:
 | `--roi-alert-active-low` | GPIO 출력을 active-low로 쓴다. |
 | `--person-roi-alert-disable-gpio <line>` | 입력이 active인 동안 사람 ROI 알림만 비활성화한다. 기본값은 `-1`이다. |
 | `--person-roi-alert-disable-active-low` | 사람 ROI 알림 비활성화 입력을 active-low로 해석한다. |
+| `--camera-properties <path>` | RGB 카메라 속성 JSON 경로다. 기본값은 `config/camera_properties.json`이다. |
 | `--person-roi-alert-disable-debounce-ms <ms>` | 사람 ROI 알림 비활성화 입력 디바운스 시간을 지정한다. 기본값은 `200`이다. |
 | `--recording-dir <path>` | preview 녹화 디렉터리를 지정한다. |
 
@@ -243,6 +245,22 @@ ROI 파일을 직접 지정:
 - 파렛트 미검출 알림은 사람 ROI 비활성화 입력의 영향을 받지 않는다.
 - PLC 24V를 Raspberry Pi GPIO에 직접 넣으면 안 된다. PLC 출력은 릴레이나 절연 접점으로 넘기고, Raspberry Pi GPIO는 3.3V 입력으로 구성한다.
 - PLC가 pulse를 내면 pulse 동안만 사람 ROI 알림이 비활성화된다. 작업 중 계속 끄려면 PLC 출력도 유지 출력이어야 한다.
+
+## 카메라 속성 설정
+
+`--camera-properties` 파일은 앱 시작 시 먼저 파싱되고, 카메라 source가 열린 뒤 적용된다. 파일이 JSON object가 아니면 카메라를 열기 전에 실패한다. 기본 파일은 Studio에서 조절하는 전체 RGB property key를 포함한다. Studio나 HTTP API로 값을 바꾸면 같은 파일에 즉시 저장되고, 다음 실행 때 다시 적용된다.
+
+```json
+{
+  "ae-enable": false,
+  "exposure-time-mode": "manual",
+  "exposure-time": 12000,
+  "analogue-gain-mode": "manual",
+  "analogue-gain": 1.5,
+  "awb-enable": true,
+  "awb-mode": "auto"
+}
+```
 
 ## HTTP API
 

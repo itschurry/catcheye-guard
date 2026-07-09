@@ -16,7 +16,8 @@ http://<host>:8090/api/
   --ws \
   --http-port 8090 \
   --hef ./install/release-arm64/models/yolo26m.hef \
-  --metadata ./install/release-arm64/models/metadata.yaml
+  --metadata ./install/release-arm64/models/metadata.yaml \
+  --camera-properties ./install/release-arm64/config/camera_properties.json
 ```
 
 ## 공통 규칙
@@ -54,7 +55,7 @@ http://<host>:8090/api/
 | `GET` | `/api/pallet-roi` | 파렛트 필수 ROI config 조회 |
 | `PUT` | `/api/pallet-roi` | 파렛트 필수 ROI config 교체 |
 | `GET` | `/api/rgb-camera/properties` | 런타임 RGB 카메라 속성 조회 |
-| `PUT` | `/api/rgb-camera/properties/<key>` | 런타임 RGB 카메라 속성 변경 |
+| `PUT` | `/api/rgb-camera/properties/<key>` | 런타임 RGB 카메라 속성 변경과 config 저장 |
 | `GET` | `/api/recording` | 녹화 상태 조회 |
 | `POST` | `/api/recording/start` | preview 녹화 시작 |
 | `POST` | `/api/recording/pause` | preview 녹화 일시정지 |
@@ -187,7 +188,7 @@ curl -X PUT \
 
 ## RGB Camera Properties
 
-런타임 GStreamer 카메라 속성을 조회하거나 바꾼다. 카메라 입력이 없거나 속성 owner를 찾지 못하면 실패한다.
+런타임 GStreamer 카메라 속성을 조회하거나 바꾼다. 앱 시작 시 `--camera-properties` JSON 파일을 먼저 파싱하고, 카메라 source가 열린 뒤 적용한다. 파일이 JSON object가 아니면 카메라를 열기 전에 실패한다. 기본 파일은 Studio에서 조절하는 전체 RGB property key를 포함한다. 카메라 입력이 없거나 속성 owner를 찾지 못하면 실패한다.
 
 ### `GET /api/rgb-camera/properties`
 
@@ -228,6 +229,22 @@ curl -X PUT \
 ```
 
 성공 시 `/api/rgb-camera/properties`와 같은 전체 속성 JSON을 반환한다.
+
+성공하면 실행 중인 카메라에 즉시 적용하고 `--camera-properties` JSON 파일에도 저장한다. GStreamer 적용이나 파일 저장이 실패하면 `500`을 반환한다.
+
+설정 파일 예:
+
+```json
+{
+  "ae-enable": false,
+  "exposure-time-mode": "manual",
+  "exposure-time": 12000,
+  "analogue-gain-mode": "manual",
+  "analogue-gain": 1.5,
+  "awb-enable": true,
+  "awb-mode": "auto"
+}
+```
 
 지원 key:
 
